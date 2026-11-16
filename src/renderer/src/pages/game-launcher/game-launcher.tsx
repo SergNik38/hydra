@@ -314,7 +314,11 @@ export default function GameLauncher() {
     }
 
     if (compatibilityLayerStatus === "failed") {
-      return t("compatibility_layer_failed");
+      return compatibilityLayerDetail
+        ? t("compatibility_layer_failed_detail", {
+            detail: compatibilityLayerDetail,
+          })
+        : t("compatibility_layer_failed");
     }
 
     if (compatibilityLayerStatus === "preparing") {
