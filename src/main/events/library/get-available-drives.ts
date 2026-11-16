@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { getMacVolumes } from "./mac-drives";
 import { registerEvent } from "../register-event";
 
 interface DriveInfo {
@@ -126,6 +127,17 @@ const getAvailableDrives = async (): Promise<DriveInfo[]> => {
       const drives = await queryLinuxDrives();
       console.log("Parsed drives:", drives.length, "drives found");
       return drives;
+    }
+
+    if (process.platform === "darwin") {
+      const volumes = await getMacVolumes();
+      const driveChecks = volumes.map(async (volume) => {
+        const drive = await getDriveInfo(volume.root);
+        return drive ? { ...drive, label: volume.label } : null;
+      });
+      const drives = await Promise.all(driveChecks);
+
+      return drives.filter((drive): drive is DriveInfo => drive !== null);
     }
 
     return [];
