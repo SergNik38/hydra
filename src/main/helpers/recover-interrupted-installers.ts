@@ -28,14 +28,20 @@ const isSamePath = (first: string, second: string) =>
     : first === second;
 
 export const isInstallerProcess = (
-  process: Pick<NativeProcessPayload, "exe" | "name" | "peExecutablePath">,
-  installerPath: string
+  processInfo: Pick<
+    NativeProcessPayload,
+    "exe" | "name" | "peExecutablePath" | "cwd"
+  >,
+  installerPath: string,
+  platform: NodeJS.Platform = process.platform
 ) => {
   const installerName = path.win32.basename(installerPath).toLowerCase();
 
-  if (process.exe && isSamePath(process.exe, installerPath)) return true;
+  if (processInfo.exe && isSamePath(processInfo.exe, installerPath)) {
+    return true;
+  }
 
-  const peExecutable = process.peExecutablePath;
+  const peExecutable = processInfo.peExecutablePath;
   if (peExecutable) {
     const unixPath = WINE_UNIX_DRIVE_PATTERN.test(peExecutable)
       ? peExecutable.slice(2).replaceAll("\\", "/")
@@ -46,8 +52,18 @@ export const isInstallerProcess = (
       : path.win32.basename(peExecutable).toLowerCase() === installerName;
   }
 
-  const runsThroughWine = !process.exe?.toLowerCase().endsWith(".exe");
-  const processName = process.name.toLowerCase();
+  // On macOS a Wine program is listed as the "wine" loader, so match it by the
+  // runtime path and the folder it was started in.
+  if (
+    platform === "darwin" &&
+    processInfo.exe?.toLowerCase().includes("/wine") &&
+    processInfo.cwd === path.dirname(installerPath)
+  ) {
+    return true;
+  }
+
+  const runsThroughWine = !processInfo.exe?.toLowerCase().endsWith(".exe");
+  const processName = processInfo.name.toLowerCase();
   const nameMatches =
     processName === installerName ||
     (processName.length >= LINUX_PROCESS_NAME_LIMIT &&

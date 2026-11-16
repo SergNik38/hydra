@@ -8,10 +8,28 @@ import { build } from "esbuild";
 
 type FindGameInstaller = (folderPath: string) => Promise<string | null>;
 type ListArchiveVolumes = (archivePath: string) => Promise<string[]>;
+type FindDownloadInstaller = (download: {
+  folderName?: string | null;
+  downloadPath?: string | null;
+}) => Promise<string | null>;
 
 let root: string;
 let findGameInstaller: FindGameInstaller;
+let findDownloadInstaller: FindDownloadInstaller;
 let listArchiveVolumes: ListArchiveVolumes;
+
+const onPlatform = async <T>(
+  platform: NodeJS.Platform,
+  run: () => Promise<T>
+): Promise<T> => {
+  const originalPlatform = process.platform;
+  Object.defineProperty(process, "platform", { value: platform });
+  try {
+    return await run();
+  } finally {
+    Object.defineProperty(process, "platform", { value: originalPlatform });
+  }
+};
 
 const createLayout = async (name: string, files: string[]) => {
   const folder = path.join(root, name);
@@ -68,9 +86,8 @@ before(async () => {
     ],
   });
 
-  ({ findGameInstaller, listArchiveVolumes } = await import(
-    pathToFileURL(bundlePath).href
-  ));
+  ({ findGameInstaller, findDownloadInstaller, listArchiveVolumes } =
+    await import(pathToFileURL(bundlePath).href));
 });
 
 after(async () => {
@@ -162,6 +179,37 @@ describe("findGameInstaller", () => {
 
   it("does not search deeper than two folders", async () => {
     assert.equal(await installerIn("deep", ["a/b/c/setup.exe"]), null);
+  });
+});
+
+describe("findDownloadInstaller on macOS", () => {
+  it("finds the Windows installer instead of giving up", async () => {
+    const folder = await createLayout("darwin-download", [
+      "setup.exe",
+      "data1.bin",
+    ]);
+
+    const installer = await onPlatform("darwin", () =>
+      findDownloadInstaller({
+        folderName: "darwin-download",
+        downloadPath: root,
+      })
+    );
+
+    assert.equal(installer, path.join(folder, "setup.exe"));
+  });
+
+  it("still returns null when the download has no installer", async () => {
+    await createLayout("darwin-installed", ["Game.exe"]);
+
+    const installer = await onPlatform("darwin", () =>
+      findDownloadInstaller({
+        folderName: "darwin-installed",
+        downloadPath: root,
+      })
+    );
+
+    assert.equal(installer, null);
   });
 });
 

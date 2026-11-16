@@ -18,6 +18,7 @@ import {
   findDownloadInstaller,
   getDownloadFolderPath,
 } from "@main/helpers/find-game-installer";
+import { resolveDarwinInstallerCommand } from "@main/helpers/darwin-wine-installer";
 import {
   endInstallerRun,
   markInstallerRunLive,
@@ -313,6 +314,39 @@ const executeLinuxInstaller = async (
   return await openUntracked(filePath);
 };
 
+const executeDarwinInstaller = async (
+  filePath: string,
+  options: InstallerLaunchOptions
+): Promise<InstallerLaunchResult> => {
+  if (!options.winePrefixPath) return await openUntracked(filePath);
+
+  let command: Awaited<ReturnType<typeof resolveDarwinInstallerCommand>>;
+
+  try {
+    command = await resolveDarwinInstallerCommand(
+      filePath,
+      options.winePrefixPath
+    );
+  } catch (error) {
+    logger.error(
+      "Failed to prepare the macOS Wine runtime for the game installer",
+      error
+    );
+    return await openUntracked(filePath);
+  }
+
+  const installer = await spawnInstaller({
+    ...command,
+    failureMessage:
+      "Failed to execute game installer with the macOS Wine runtime",
+    onExit: options.onExit,
+  });
+  if (installer.spawned)
+    return trackedLaunch(filePath, "with the macOS Wine runtime");
+
+  return await openUntracked(filePath);
+};
+
 const executeGameInstaller = async (
   filePath: string,
   options: InstallerLaunchOptions
@@ -323,6 +357,10 @@ const executeGameInstaller = async (
 
   if (process.platform === "linux") {
     return await executeLinuxInstaller(filePath, options);
+  }
+
+  if (process.platform === "darwin") {
+    return await executeDarwinInstaller(filePath, options);
   }
 
   return await openUntracked(filePath);

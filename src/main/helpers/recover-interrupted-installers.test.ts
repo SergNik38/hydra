@@ -10,11 +10,13 @@ type InstallerProcess = {
   exe: string | null;
   name: string;
   peExecutablePath?: string | null;
+  cwd?: string | null;
 };
 
 type IsInstallerProcess = (
   process: InstallerProcess,
-  installerPath: string
+  installerPath: string,
+  platform?: NodeJS.Platform
 ) => boolean;
 
 let root: string;
@@ -157,6 +159,47 @@ describe("isInstallerProcess on Linux", () => {
     );
     assert.equal(
       matches({ exe: "/usr/bin/wine64-preloader", name: "setup" }),
+      false
+    );
+  });
+});
+
+describe("isInstallerProcess on macOS", () => {
+  const installer = "/Users/user/Downloads/Example/setup.exe";
+  const wineExe =
+    "/Applications/Wine Staging.app/Contents/Resources/wine/lib/wine/x86_64-unix/wine";
+  const matches = (process: InstallerProcess) =>
+    isInstallerProcess(process, installer, "darwin");
+
+  it("matches the Wine runtime started in the installer folder", () => {
+    assert.equal(
+      matches({
+        exe: wineExe,
+        name: "wine",
+        cwd: "/Users/user/Downloads/Example",
+      }),
+      true
+    );
+  });
+
+  it("ignores the Wine runtime started in another folder", () => {
+    assert.equal(
+      matches({
+        exe: wineExe,
+        name: "wine",
+        cwd: "/Users/user/Downloads/Other",
+      }),
+      false
+    );
+  });
+
+  it("ignores a process named wine that is not the Wine runtime", () => {
+    assert.equal(
+      matches({
+        exe: "/usr/local/bin/proton",
+        name: "wine",
+        cwd: "/Users/user/Downloads/Example",
+      }),
       false
     );
   });
