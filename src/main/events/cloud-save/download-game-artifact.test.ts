@@ -118,6 +118,13 @@ const runDownload = async (
     "@main/services/cloud-save/legacy-cloud-save-policy": {
       assertLegacyCloudSaveWriteAllowed,
     },
+    "@main/services/cloud-save/legacy-wine-prefix": {
+      legacyCloudSyncPrefixPath: (
+        _platform: string,
+        _executablePath: string | null | undefined,
+        effectivePrefixPath: string | null
+      ) => effectivePrefixPath,
+    },
     "./game-artifact-download": {
       requestGameArtifactDownload: async (artifactId: string) => {
         requests.push(artifactId);
@@ -135,6 +142,7 @@ const runDownload = async (
   try {
     runInNewContext(handlerCode, {
       exports: {},
+      process,
       require: (id: string) => {
         assert.ok(id in dependencies, `Unexpected dependency: ${id}`);
         return dependencies[id];

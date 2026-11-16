@@ -8,7 +8,7 @@ import type { Game } from "../../../types/level.types";
 const DEFAULT_PREFIX = "/prefixes/Namespace:Item";
 const MANAGED_PREFIX = "/prefixes/epic/owner-artifact";
 
-function load(game: Game | undefined) {
+function load(game: Game | undefined, platform: NodeJS.Platform = "linux") {
   const state = {
     managedRequests: [] as unknown[][],
     environmentPrefixes: [] as Array<string | undefined>,
@@ -47,6 +47,10 @@ function load(game: Game | undefined) {
     "./emulator-provider-identity": {
       emulatorEnvironmentId: (id: string) => id,
     },
+    "./windows-compatibility-host.js": {
+      isCloudSaveWindowsCompatibilityHost: (platform: string) =>
+        platform === "linux" || platform === "mac",
+    },
     "./cloud-save-environment": {
       resolveCloudSaveEnvironment: async (context: {
         winePrefixPath?: string;
@@ -80,7 +84,7 @@ function load(game: Game | undefined) {
     exports: context,
     require: (specifier: string) =>
       modules[specifier] ?? assert.fail(`Unexpected dependency: ${specifier}`),
-    process: { ...process, platform: "linux" },
+    process: { ...process, platform },
   });
   return { context, state };
 }
@@ -126,4 +130,33 @@ test("unmanaged Windows games keep the default per-game prefix", async () => {
   await context.getCloudSaveGameContext("Namespace:Item", "steam");
   assert.equal(state.managedRequests.length, 0);
   assert.deepEqual(state.environmentPrefixes, [DEFAULT_PREFIX]);
+});
+
+test("Wine-hosted Windows games on macOS resolve the per-game prefix", async () => {
+  const { context, state } = load(
+    {
+      ...managedGame,
+      shop: "steam",
+      epicInstallation: undefined,
+    } as Game,
+    "darwin"
+  );
+  await context.getCloudSaveGameContext("Namespace:Item", "steam");
+  assert.equal(state.managedRequests.length, 0);
+  assert.deepEqual(state.environmentPrefixes, [DEFAULT_PREFIX]);
+});
+
+test("native macOS games keep no Wine prefix", async () => {
+  const { context, state } = load(
+    {
+      ...managedGame,
+      shop: "steam",
+      epicInstallation: undefined,
+      executablePath: "/Applications/Game.app/Contents/MacOS/Game",
+    } as Game,
+    "darwin"
+  );
+  await context.getCloudSaveGameContext("Namespace:Item", "steam");
+  assert.equal(state.managedRequests.length, 0);
+  assert.deepEqual(state.environmentPrefixes, [undefined]);
 });

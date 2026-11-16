@@ -10,6 +10,7 @@ import type {
   GameShop,
 } from "@types";
 import { getWinePrefixUserProfile } from "../wine-prefix.js";
+import { isCloudSaveWindowsCompatibilityHost } from "./windows-compatibility-host.js";
 
 export const CLOUD_SAVE_CUSTOM_PATH_PREFIX = "<custom>";
 export const CLOUD_SAVE_CUSTOM_ABSOLUTE_PATH_MARKER = "<absolute>";
@@ -170,7 +171,7 @@ export const cloudSaveCustomPathContextFromPathContext = (
   >
 ): CloudSaveCustomPathContext => {
   const windowsCompatibility =
-    context.platform === "linux" &&
+    isCloudSaveWindowsCompatibilityHost(context.platform) &&
     context.executablePath?.toLowerCase().endsWith(".exe") === true;
   const winePrefixPath = windowsCompatibility
     ? context.winePrefixPath
@@ -182,6 +183,11 @@ export const cloudSaveCustomPathContextFromPathContext = (
     installDir: installDirectory(context.executablePath),
     storeRoot: derivedStoreRoot(context.executablePath) ?? context.steamPath,
     storeUserIds: storeUserIdsFromContext(context),
+  };
+  const wineCompatibility = {
+    windowsCompatibility,
+    winePrefixPath,
+    wineUserProfilePath,
   };
 
   if (context.platform === "windows") {
@@ -199,6 +205,7 @@ export const cloudSaveCustomPathContextFromPathContext = (
     return {
       ...context,
       ...common,
+      ...wineCompatibility,
       xdgDataDir:
         context.appDataDir ||
         path.posix.join(context.homeDir, "Library", "Application Support"),
@@ -208,12 +215,10 @@ export const cloudSaveCustomPathContextFromPathContext = (
   return {
     ...context,
     ...common,
+    ...wineCompatibility,
     xdgDataDir: path.posix.join(context.homeDir, ".local", "share"),
     xdgConfigDir:
       context.appDataDir || path.posix.join(context.homeDir, ".config"),
-    windowsCompatibility,
-    winePrefixPath,
-    wineUserProfilePath,
   };
 };
 
@@ -477,7 +482,7 @@ const portableWindowsPathFromWineAbsolute = (
   context: CloudSaveCustomPathContext
 ) => {
   if (
-    context.platform !== "linux" ||
+    !isCloudSaveWindowsCompatibilityHost(context.platform) ||
     !context.windowsCompatibility ||
     !context.wineUserProfilePath
   ) {
@@ -531,7 +536,10 @@ const resolveWindowsPortablePathInWine = (
   portablePath: string,
   context: CloudSaveCustomPathContext
 ) => {
-  if (context.platform !== "linux" || !context.windowsCompatibility) {
+  if (
+    !isCloudSaveWindowsCompatibilityHost(context.platform) ||
+    !context.windowsCompatibility
+  ) {
     throw new Error("cloud_save_custom_path_foreign_platform");
   }
   if (!context.winePrefixPath) {
@@ -707,7 +715,7 @@ const resolveDecodedCustomPath = (
   }
   if (
     platform !== "windows" ||
-    context.platform !== "linux" ||
+    !isCloudSaveWindowsCompatibilityHost(context.platform) ||
     !context.windowsCompatibility
   ) {
     throw new Error("cloud_save_custom_path_foreign_platform");
@@ -780,12 +788,12 @@ export const encodeCloudSaveCustomPath = (
     context
   );
   const insideActiveWinePrefix =
-    context.platform === "linux" &&
+    isCloudSaveWindowsCompatibilityHost(context.platform) &&
     context.windowsCompatibility &&
     context.winePrefixPath &&
     isSameOrChildPath(normalizedPath, context.winePrefixPath, "linux");
   const portableWindowsHostPath =
-    context.platform === "linux" &&
+    isCloudSaveWindowsCompatibilityHost(context.platform) &&
     context.windowsCompatibility &&
     ((context.installDir &&
       isSameOrChildPath(normalizedPath, context.installDir, "linux")) ||
@@ -885,7 +893,7 @@ const getCanonicalAllowedWineRoots = async (
   context: CloudSaveCustomPathContext
 ) => {
   if (
-    context.platform !== "linux" ||
+    !isCloudSaveWindowsCompatibilityHost(context.platform) ||
     customPath.platform !== "windows" ||
     !context.windowsCompatibility
   ) {

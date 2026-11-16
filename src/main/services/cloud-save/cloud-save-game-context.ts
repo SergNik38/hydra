@@ -14,6 +14,7 @@ import { getRetroArchConfig } from "../retroarch/retroarch-repository";
 import { getEmulatorSaveEnvironmentKey } from "./emulator-save-provider";
 import { emulatorEnvironmentId } from "./emulator-provider-identity";
 import { getCloudSaveGameRecord } from "./recompilation-cloud-save";
+import { isCloudSaveWindowsCompatibilityHost } from "./windows-compatibility-host.js";
 
 import {
   resolveCloudSaveEnvironment,
@@ -90,7 +91,7 @@ export const getCloudSaveGameContext = async (
     : (overrides?.executablePath ?? game?.executablePath ?? undefined);
   const usesWindowsCompatibility =
     !emulatorProvider &&
-    platform === "linux" &&
+    isCloudSaveWindowsCompatibilityHost(platform) &&
     executablePath?.toLowerCase().endsWith(".exe") === true;
   const requestedWinePrefixPath = await getRequestedWinePrefixPath(
     usesWindowsCompatibility,

@@ -53,6 +53,16 @@ const macContext = (userName: string): CloudSaveCustomPathContext => ({
   xdgConfigDir: `/Users/${userName}/Library/Preferences`,
 });
 
+const darwinWineContext = (
+  userName: string,
+  winePrefixPath = `/Users/${userName}/Library/Application Support/hydra/wine-prefixes/Game`
+): CloudSaveCustomPathContext => ({
+  ...macContext(userName),
+  windowsCompatibility: true,
+  winePrefixPath,
+  wineUserProfilePath: `${winePrefixPath}/drive_c/users/steamuser`,
+});
+
 describe("cloud save custom path codec", () => {
   it("encodes known directories with the same portable tokens as normal saves", () => {
     assert.deepEqual(
@@ -256,6 +266,100 @@ describe("cloud save custom path codec", () => {
       )
     );
   });
+
+  it("encodes a selected Wine profile directory as a Windows custom path on macOS", () => {
+    const context = darwinWineContext("rodrigo");
+    const selectedPath =
+      "/Users/rodrigo/Library/Application Support/hydra/wine-prefixes/Game/drive_c/users/steamuser/AppData/Roaming/Game";
+
+    assert.deepEqual(encodeCloudSaveCustomPath(selectedPath, context), {
+      rawPath: "<custom><windows><winAppData>/Game",
+      path: selectedPath,
+      platform: "windows",
+    });
+    assert.equal(
+      decodeCloudSaveCustomPath("<custom><windows><winAppData>/Game", context)
+        .path,
+      selectedPath
+    );
+  });
+
+  it("keeps macOS custom paths platform-specific instead of aliasing them", () => {
+    const rawPath = "<custom><windows><winDocuments>/Game";
+
+    assert.throws(() =>
+      decodeCloudSaveCustomPath(rawPath, macContext("rodrigo"))
+    );
+    assert.equal(
+      decodeCloudSaveCustomPath(rawPath, darwinWineContext("rodrigo")).path,
+      "/Users/rodrigo/Library/Application Support/hydra/wine-prefixes/Game/drive_c/users/steamuser/Documents/Game"
+    );
+  });
+
+  it("treats a macOS game without a .exe as native", () => {
+    const context = cloudSaveCustomPathContextFromPathContext({
+      objectId: "game",
+      platform: "mac",
+      homeDir: "/Users/hydra",
+      executablePath: "/Applications/Game.app/Contents/MacOS/Game",
+      winePrefixPath:
+        "/Users/hydra/Library/Application Support/hydra/wine-prefixes/game",
+      storeUserContext: { known: [] },
+    });
+
+    assert.ok(!context.windowsCompatibility);
+    assert.equal(context.winePrefixPath, undefined);
+    assert.equal(context.wineUserProfilePath, undefined);
+    assert.throws(() =>
+      decodeCloudSaveCustomPath("<custom><windows><winDocuments>/Game", context)
+    );
+  });
+
+  it(
+    "gates the macOS Wine profile mapping on the .exe executable",
+    { skip: process.platform === "win32" },
+    async () => {
+      const directory = await fs.mkdtemp(
+        path.join(os.homedir(), "hydra-custom-path-darwin-wine-")
+      );
+      const prefix = path.join(directory, "prefix");
+      const profile = path.join(prefix, "drive_c", "users", "steamuser");
+      await fs.mkdir(profile, { recursive: true });
+      await fs.writeFile(
+        path.join(prefix, "user.reg"),
+        String.raw`WINE REGISTRY Version 2
+
+[Volatile Environment]
+"USERPROFILE"="C:\\users\\steamuser"
+`
+      );
+
+      try {
+        const context = cloudSaveCustomPathContextFromPathContext({
+          objectId: "game",
+          platform: "mac",
+          homeDir: path.join(directory, "home"),
+          executablePath: path.join(directory, "Game", "game.exe"),
+          winePrefixPath: prefix,
+          storeUserContext: { known: [] },
+        });
+        const realProfile = await fs.realpath(profile);
+
+        assert.equal(context.windowsCompatibility, true);
+        assert.equal(context.winePrefixPath, prefix);
+        assert.equal(context.wineUserProfilePath, realProfile);
+        assert.equal(
+          decodeCloudSaveCustomPath(
+            "<custom><windows><winDocuments>/Game",
+            context
+          ).path,
+          `${realProfile.replaceAll("\\", "/")}/Documents/Game`
+        );
+      } finally {
+        await fs.rm(directory, { recursive: true, force: true });
+      }
+    }
+  );
 
   it("uses base and store-user tokens when the normal resolver can rebase them", () => {
     const sender = windowsContext("Rodrigo");

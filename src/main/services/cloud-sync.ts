@@ -14,13 +14,17 @@ import axios from "axios";
 import { Ludusavi } from "./ludusavi";
 import { formatDate, SubscriptionRequiredError } from "@shared";
 import { assertLegacyCloudSaveWriteAllowed } from "./cloud-save/legacy-cloud-save-policy";
+import { legacyCloudSyncPrefixPath } from "./cloud-save/legacy-wine-prefix";
 import i18next, { t } from "i18next";
 import { SystemPath } from "./system-path";
 import { Wine } from "./wine";
 
 export class CloudSync {
   public static getWindowsLikeUserProfilePath(winePrefixPath?: string | null) {
-    if (process.platform === "linux") {
+    if (
+      process.platform === "linux" ||
+      (process.platform === "darwin" && winePrefixPath)
+    ) {
       if (!winePrefixPath) {
         throw new Error("Wine prefix path is required");
       }
@@ -102,9 +106,10 @@ export class CloudSync {
 
     const game = await gamesSublevel.get(levelKeys.game(shop, objectId));
     assertLegacyCloudSaveWriteAllowed(game);
-    const effectiveWinePrefixPath = Wine.getEffectivePrefixPath(
-      game?.winePrefixPath,
-      objectId
+    const effectiveWinePrefixPath = legacyCloudSyncPrefixPath(
+      process.platform,
+      game?.executablePath,
+      Wine.getEffectivePrefixPath(game?.winePrefixPath, objectId)
     );
 
     const bundleLocation = await this.bundleBackup(

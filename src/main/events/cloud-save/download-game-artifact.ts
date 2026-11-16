@@ -14,6 +14,7 @@ import { gamesSublevel, levelKeys } from "@main/level";
 import { requestGameArtifactDownload } from "./game-artifact-download";
 import { pipeline } from "node:stream/promises";
 import { runWithHydraSaveGuard } from "@main/services/epic/cloud-saves";
+import { legacyCloudSyncPrefixPath } from "@main/services/cloud-save/legacy-wine-prefix";
 
 export const transformLudusaviBackupPathIntoWindowsPath = (
   backupPath: string,
@@ -102,9 +103,10 @@ const downloadGameArtifact = async (
   return runWithHydraSaveGuard(async () => {
     try {
       const game = await gamesSublevel.get(levelKeys.game(shop, objectId));
-      const effectiveWinePrefixPath = Wine.getEffectivePrefixPath(
-        game?.winePrefixPath,
-        objectId
+      const effectiveWinePrefixPath = legacyCloudSyncPrefixPath(
+        process.platform,
+        game?.executablePath,
+        Wine.getEffectivePrefixPath(game?.winePrefixPath, objectId)
       );
 
       const {

@@ -27,6 +27,7 @@ import { isEmulatorSaveRawPath } from "./emulator-provider-identity";
 import { buildCloudSaveAggregateHash } from "./snapshot-aggregate-hash";
 import { blockAmbiguousRestoreTargets } from "./restore-target-collision";
 import { filterUnsafeEmulatorRestoreTargets } from "./emulator-restore-plan";
+import { isCloudSaveWindowsCompatibilityHost } from "./windows-compatibility-host.js";
 
 const isWinePrefixValid = (winePrefixPath?: string) => {
   if (!winePrefixPath) return false;
@@ -117,7 +118,7 @@ export const resolveRestoreManifestTargets = async (
     : [];
   const usesWindowsCompatibility =
     !getEmulatorSaveProvider(gameContext.game) &&
-    pathContext.platform === "linux" &&
+    isCloudSaveWindowsCompatibilityHost(pathContext.platform) &&
     pathContext.executablePath?.toLowerCase().endsWith(".exe") === true;
   const winePrefixIsValid = isWinePrefixValid(effectiveWinePrefixPath);
   logger.info("[Cloud Save] Resolving remote snapshot targets", {
