@@ -21,7 +21,11 @@ import type { Game } from "@types";
 const TEST_SAVE_SYNC_TIMEOUT_MS = 10_000;
 
 async function fixture(t: TestContext, options: { linux?: boolean } = {}) {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "epic-save-service-"));
+  // Expected save paths are built from this root, and the service realpaths
+  // what it reports, so resolve the symlinked macOS tmpdir once up front.
+  const root = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "epic-save-service-"))
+  );
   t.after(() => fsp.rm(root, { recursive: true, force: true }));
   const local = path.join(root, "local"),
     remote = path.join(root, "remote"),

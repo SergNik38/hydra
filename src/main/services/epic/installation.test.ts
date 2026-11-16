@@ -110,7 +110,11 @@ const game: Game = {
 };
 
 async function fixture(t: TestContext, platform: NodeJS.Platform = "win32") {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "hydra-epic-install-"));
+  // Install paths are validated against their realpath, so keep fixtures on a
+  // resolved root (macOS tmpdir is /var, a symlink to /private/var).
+  const root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), "hydra-epic-install-"))
+  );
   let local = structuredClone(game);
   let remoteOwned = true;
   let activeAuth = auth;

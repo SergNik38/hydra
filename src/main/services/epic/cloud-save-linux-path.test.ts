@@ -9,12 +9,28 @@ import {
 } from "./cloud-save-linux-path.js";
 
 async function fixture(t: TestContext) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "epic-save-path-"));
+  // The code under test resolves real paths, so fixtures must start resolved
+  // too (macOS tmpdir is /var, which is a symlink to /private/var).
+  const root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), "epic-save-path-"))
+  );
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const prefix = path.join(root, "prefix");
   const profile = path.join(prefix, "drive_c", "users", "steamuser");
   await fs.mkdir(profile, { recursive: true });
   return { root, prefix, profile };
+}
+
+/** Case-variant entries cannot coexist on a case-insensitive filesystem. */
+async function isCaseSensitive(root: string): Promise<boolean> {
+  await fs.mkdir(path.join(root, "case-probe"));
+  try {
+    await fs.mkdir(path.join(root, "CASE-PROBE"));
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
 }
 
 test("automatic Windows save references keep real casing and preserve a missing suffix", async (t) => {
@@ -85,6 +101,10 @@ test(
   { skip: process.platform === "win32" },
   async (t) => {
     const f = await fixture(t);
+    if (!(await isCaseSensitive(f.root))) {
+      t.skip("needs a case-sensitive filesystem to hold both Saves and SAVES");
+      return;
+    }
     await fs.mkdir(path.join(f.profile, "Saves"));
     await fs.mkdir(path.join(f.profile, "SAVES"));
     await assert.rejects(
