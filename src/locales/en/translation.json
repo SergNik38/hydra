@@ -2748,6 +2748,7 @@
     "preparing_compatibility_layer": "Preparing compatibility layer",
     "preparing_compatibility_layer_detail": "Preparing compatibility layer ({{detail}})",
     "compatibility_layer_failed": "The compatibility layer failed to start the game",
+    "compatibility_layer_failed_detail": "The compatibility layer failed to start the game ({{detail}})",
     "close": "Close"
   },
   "notifications_page": {
