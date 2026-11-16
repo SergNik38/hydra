@@ -71,6 +71,7 @@ import {
 import { updateGameRecord } from "./game-record-updater";
 import { onScreenshotGameClosed, onScreenshotGameStarted } from "./screenshots";
 import { GameExecutables } from "./game-executables";
+import { matchesCatalogueExecutable } from "./process-catalogue-match";
 import {
   onManagedEpicClosed,
   onManagedEpicDetected,
@@ -212,10 +213,7 @@ const findGamePathByProcess = async (
 
     if (pathSet) {
       for (const path of pathSet) {
-        if (
-          path.toLowerCase().endsWith(executable.name) ||
-          path.toLowerCase().endsWith(executablewithoutExtension)
-        ) {
+        if (matchesCatalogueExecutable(platform, executable, path)) {
           const gameKey = levelKeys.game("steam", gameId);
           const game = await gamesSublevel.get(gameKey);
 

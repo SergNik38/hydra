@@ -24,6 +24,11 @@ export const normalizeGameExecutableCatalog = (
             return executable.os === "linux" || executable.os === "win32";
           }
 
+          // Windows builds run through the managed Wine on macOS.
+          if (platform === "darwin") {
+            return executable.os === "darwin" || executable.os === "win32";
+          }
+
           return false;
         })
         .map((executable) => {

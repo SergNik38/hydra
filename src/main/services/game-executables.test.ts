@@ -10,6 +10,7 @@ const catalog = {
   "10": [
     { name: ">folder/game.exe", os: "win32" },
     { name: "folder/game", os: "linux" },
+    { name: "NativeGame.app/Contents/MacOS/game", os: "darwin" },
   ],
   "20": [{ name: "other/tool.exe", os: "win32" }],
 };
@@ -27,6 +28,16 @@ describe("game executable catalogue", () => {
       "10": [
         { name: "folder/game.exe", exe: "game.exe" },
         { name: "folder/game", exe: "game" },
+      ],
+      "20": [{ name: "other/tool.exe", exe: "tool.exe" }],
+    });
+  });
+
+  it("keeps native and Wine executables on macOS", () => {
+    assert.deepEqual(normalizeGameExecutableCatalog(catalog, "darwin"), {
+      "10": [
+        { name: "folder/game.exe", exe: "game.exe" },
+        { name: "nativegame.app/contents/macos/game", exe: "game" },
       ],
       "20": [{ name: "other/tool.exe", exe: "tool.exe" }],
     });
