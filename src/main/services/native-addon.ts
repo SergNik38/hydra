@@ -277,9 +277,12 @@ function buildMaps(processes) {
       inspectionComplete: proc.inspectionComplete,
     });
     const key = proc.name && proc.name.toLowerCase();
-    const value = platform === 'win32'
-      ? proc.exe
-      : path.join(proc.cwd || '', proc.name || '');
+    let value = path.join(proc.cwd || '', proc.name || '');
+    if (platform === 'win32') {
+      value = proc.exe;
+    } else if (platform === 'darwin') {
+      value = proc.exe || value;
+    }
 
     if (!key || !value) continue;
 

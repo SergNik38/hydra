@@ -34,6 +34,10 @@ import {
   type LinuxProcessInfo,
 } from "./linux-process-match";
 import { isWindowsBatchFile } from "@main/helpers/windows-batch-command";
+import {
+  expandDarwinExecutablePath,
+  hasDarwinProcessMatch,
+} from "./darwin-process-match";
 import { HydraApi } from "./hydra-api";
 import { isSteamAppExecutable } from "./steam-integration/steam-library-executable";
 import {
@@ -389,6 +393,23 @@ export const watchProcesses = async () => {
       matchPaths = [executablePath, ...trackingPaths];
     }
 
+    // macOS games are often stored as .app bundles while the running process
+    // is the inner binary, so expand bundles before matching.
+    const darwinCandidates =
+      platform === "darwin"
+        ? new Map(
+            await Promise.all(
+              matchPaths.map(
+                async (matchPath) =>
+                  [
+                    matchPath,
+                    await expandDarwinExecutablePath(matchPath),
+                  ] as const
+              )
+            )
+          )
+        : null;
+
     let matchedPath = matchPaths.find((matchPath) => {
       const executable = matchPath
         .slice(matchPath.lastIndexOf(platform === "win32" ? "\\" : "/") + 1)
@@ -400,6 +421,13 @@ export const watchProcesses = async () => {
         return (
           hasLinuxNativeOrAppImageMatch(matchPath, linuxProcesses) ||
           hasLinuxCompatibilityProcessMatch(game, matchPath, linuxProcesses)
+        );
+      }
+
+      if (platform === "darwin" && darwinCandidates) {
+        return hasDarwinProcessMatch(
+          darwinCandidates.get(matchPath) ?? [],
+          processMap
         );
       }
 
