@@ -15,8 +15,10 @@ import * as ownershipToken from "./ownership-token.js";
 import * as windowsPath from "./windows-path.js";
 
 async function fixture(t: TestContext, options: { linux?: boolean } = {}) {
-  const root = await fsp.mkdtemp(
-    path.join(os.tmpdir(), "epic-launch-session-")
+  // Production resolves install/executable paths with realpath; macOS tmpdir
+  // itself is a symlink (/var -> /private/var), so resolve it here as well.
+  const root = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "epic-launch-session-"))
   );
   t.after(() => fsp.rm(root, { recursive: true, force: true }));
   const executable = path.join(root, "Game with spaces.exe");
