@@ -260,6 +260,12 @@ function fixture() {
         "./game-launcher-status": { markGameLauncherGameDetected: () => {} },
         "./process-watcher-scan": {},
         "./linux-process-match": {},
+        "./darwin-process-match": {
+          expandDarwinExecutablePath: async (executablePath: string) => [
+            executablePath,
+          ],
+          hasDarwinProcessMatch: () => false,
+        },
         "@main/helpers/windows-batch-command": {},
         "./steam-integration/steam-library-executable": {
           isSteamAppExecutable: async () => false,

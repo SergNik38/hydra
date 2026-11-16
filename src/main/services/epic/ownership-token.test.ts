@@ -9,7 +9,11 @@ import {
 } from "./ownership-token.js";
 
 async function fixture(t: TestContext) {
-  const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "epic-ownership-"));
+  // The token service realpaths the workspace, so start on a resolved root
+  // (macOS tmpdir is /var, a symlink to /private/var).
+  const workspace = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), "epic-ownership-"))
+  );
   t.after(() => fs.rm(workspace, { recursive: true, force: true }));
   const file = path.join(workspace, "tmp", "NamespaceItem.ovt");
   const parameters = (args: string[]) => ({

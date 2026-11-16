@@ -22,7 +22,11 @@ function gate() {
 }
 
 async function fixture(t: TestContext) {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "epic-linux-runtime-"));
+  // The runtime reports realpaths, so start on a resolved root (macOS tmpdir
+  // is /var, a symlink to /private/var).
+  const root = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "epic-linux-runtime-"))
+  );
   t.after(() => fsp.rm(root, { recursive: true, force: true }));
   const proton = path.join(root, "Proton with spaces");
   const umu = path.join(root, "umu-run");

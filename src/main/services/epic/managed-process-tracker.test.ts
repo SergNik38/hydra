@@ -6,8 +6,14 @@ import test from "node:test";
 import { EpicManagedProcessTracker } from "./managed-process-tracker.js";
 import type { EpicProcessNode } from "./managed-process-tracker.js";
 
+/** Scans report realpaths, so fixtures must start on a resolved root
+ * (macOS tmpdir is /var, a symlink to /private/var). */
+async function temporaryRoot(prefix: string) {
+  return fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), prefix)));
+}
+
 test("keeps the real child alive after its captured bootstrapper exits, without matching unrelated games", async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "epic-process-tree-"));
+  const root = await temporaryRoot("epic-process-tree-");
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const bootstrap = path.join(root, "bootstrap.exe"),
     shipping = path.join(root, "shipping.exe");
@@ -46,7 +52,7 @@ test("keeps the real child alive after its captured bootstrapper exits, without 
 });
 
 test("missing ancestry/executable information and realpath escapes never prove a close", async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "epic-process-proof-"));
+  const root = await temporaryRoot("epic-process-proof-");
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const install = path.join(root, "install"),
     outside = path.join(root, "outside");
@@ -78,9 +84,7 @@ test("missing ancestry/executable information and realpath escapes never prove a
 });
 
 test("retains a proven external intermediary until its delayed game descendant exits", async (t) => {
-  const root = await fs.mkdtemp(
-    path.join(os.tmpdir(), "epic-process-wrapper-")
-  );
+  const root = await temporaryRoot("epic-process-wrapper-");
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const install = path.join(root, "install");
   await fs.mkdir(install);
@@ -118,7 +122,7 @@ test("retains a proven external intermediary until its delayed game descendant e
 });
 
 async function linuxFixture(t: test.TestContext) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "epic-linux-proof-"));
+  const root = await temporaryRoot("epic-linux-proof-");
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const install = path.join(root, "Game");
   const prefix = path.join(root, "Prefix");

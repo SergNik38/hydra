@@ -9,7 +9,11 @@ import {
 } from "./windows-path.js";
 
 test("Windows references resolve spaces/casing and reject escape or ambiguous names", async (t) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "epic-win-path-"));
+  // Resolution reports realpaths, so start on a resolved root (macOS tmpdir is
+  // /var, a symlink to /private/var).
+  const root = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), "epic-win-path-"))
+  );
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, "Game Binaries"));
   const exe = path.join(root, "Game Binaries", "Game.exe");

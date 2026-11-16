@@ -32,7 +32,10 @@ afterEach(() => {
 
 const launchFakeUmu = (
   script: string,
-  options: { wasGameDetected?: () => boolean } = {}
+  options: {
+    wasGameDetected?: () => boolean;
+    quickExitThresholdMs?: number;
+  } = {}
 ) => {
   const statuses: UmuStatus[] = [];
   const logStartOffset = fs.statSync(logPath).size;
@@ -46,7 +49,8 @@ const launchFakeUmu = (
     child,
     umuLogPath: logPath,
     logStartOffset,
-    quickExitThresholdMs: QUICK_EXIT_THRESHOLD_MS,
+    quickExitThresholdMs:
+      options.quickExitThresholdMs ?? QUICK_EXIT_THRESHOLD_MS,
     onStatus: (status) => statuses.push(status),
     wasGameDetected: options.wasGameDetected,
   });
@@ -152,10 +156,17 @@ describe("umu launch monitor", () => {
   });
 
   it("rejects early exits with the umu failure detail", async () => {
-    const { exited, launched } = launchFakeUmu(`
+    // Node startup on a loaded host can exceed the default quick-exit window,
+    // which would turn this genuine early exit into a late one. Keep the
+    // process start well inside a generous threshold so the assertion is about
+    // the early-exit path, not the machine's spawn latency.
+    const { exited, launched } = launchFakeUmu(
+      `
       console.log("ERROR: runtime setup failed");
       process.exit(2);
-    `);
+    `,
+      { quickExitThresholdMs: 5_000 }
+    );
 
     await assert.rejects(launched, (error: unknown) => {
       assert.ok(error instanceof UmuEarlyExitError);
