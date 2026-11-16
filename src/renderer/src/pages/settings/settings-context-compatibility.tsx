@@ -14,6 +14,10 @@ import { useAppSelector } from "@renderer/hooks";
 import type { ProtonVersion } from "@types";
 import { DesktopDownloadIcon, LinkExternalIcon } from "@primer/octicons-react";
 import { logger } from "@renderer/logger";
+import {
+  supportsLinuxCompatibilityTools,
+  supportsWinePrefix,
+} from "@renderer/helpers/compatibility-platform";
 import { Tooltip } from "react-tooltip";
 
 import "./settings-context-compatibility.scss";
@@ -25,7 +29,11 @@ export function SettingsContextCompatibility() {
   const { t } = useTranslation("settings");
   const { t: tGameDetails } = useTranslation("game_details");
   const { updateUserPreferences } = useContext(settingsContext);
-  const shouldShowCommonRedist = window.electron.platform === "win32";
+  const platform = window.electron.platform;
+  const shouldShowCommonRedist = platform === "win32";
+  const shouldShowWinePrefix = supportsWinePrefix(platform);
+  const shouldShowLinuxCompatibilityTools =
+    supportsLinuxCompatibilityTools(platform);
 
   const userPreferences = useAppSelector(
     (state) => state.userPreferences.value
@@ -118,7 +126,7 @@ export function SettingsContextCompatibility() {
   }, []);
 
   useEffect(() => {
-    if (window.electron.platform !== "linux") {
+    if (!supportsWinePrefix(window.electron.platform)) {
       setDefaultWinePrefixBasePath("");
       setDefaultWinePrefixPath("");
       return;
@@ -223,7 +231,7 @@ export function SettingsContextCompatibility() {
 
   return (
     <div className="settings-context-panel settings-context-compatibility">
-      {window.electron.platform === "linux" && (
+      {shouldShowWinePrefix && (
         <div className="settings-context-panel__group">
           <div className="settings-context-compatibility__stack">
             <div className="settings-context-compatibility__section">
@@ -258,131 +266,135 @@ export function SettingsContextCompatibility() {
               />
             </div>
 
-            <div className="settings-context-compatibility__proton-section settings-context-compatibility__section">
-              <p className="settings-context-compatibility__proton-description">
-                {t("default_proton_version_description")}
-              </p>
+            {shouldShowLinuxCompatibilityTools && (
+              <div className="settings-context-compatibility__proton-section settings-context-compatibility__section">
+                <p className="settings-context-compatibility__proton-description">
+                  {t("default_proton_version_description")}
+                </p>
 
-              <ProtonPathPicker
-                versions={protonVersions}
-                selectedPath={selectedDefaultProtonPath}
-                onChange={(value) => {
-                  setSelectedDefaultProtonPath(value);
-                  updateUserPreferences({ defaultProtonPath: value || null });
-                }}
-                radioName="default-proton-version"
-                autoLabel={protonVersionAutoLabel}
-                autoSourceDescription={protonSourceUmuDefault}
-                steamSourceDescription={protonSourceSteam}
-                compatibilityToolsSourceDescription={
-                  protonSourceCompatibilityTools
-                }
-              />
-            </div>
-
-            <div className="settings-context-compatibility__section settings-context-compatibility__global-toggles">
-              <h3 className="settings-context-compatibility__proton-title">
-                {t("behavior")}
-              </h3>
-
-              <div className="settings-context-compatibility__gamemode-toggle">
-                <CheckboxField
-                  label={
-                    <span
-                      className={`settings-context-compatibility__gamemode-label ${
-                        !gamemodeAvailable
-                          ? "settings-context-compatibility__gamemode-label--disabled"
-                          : ""
-                      }`}
-                      data-tooltip-id={
-                        !gamemodeAvailable
-                          ? "settings-gamemode-unavailable-tooltip"
-                          : undefined
-                      }
-                      data-tooltip-content={
-                        !gamemodeAvailable
-                          ? tGameDetails("gamemode_not_available_tooltip", {
-                              defaultValue:
-                                "GameMode is not available in your PATH",
-                            })
-                          : undefined
-                      }
-                    >
-                      <span>{tGameDetails("run_with_gamemode_prefix")}</span>
-                      <Link
-                        to={GAMEMODE_SITE_URL}
-                        className="settings-context-compatibility__gamemode-link"
-                      >
-                        GameMode
-                        <LinkExternalIcon />
-                      </Link>
-                    </span>
-                  }
-                  checked={autoRunGamemode}
-                  disabled={!gamemodeAvailable}
-                  onChange={() =>
-                    setAutoRunGamemode((previousValue) => {
-                      const nextValue = !previousValue;
-                      updateUserPreferences({ autoRunGamemode: nextValue });
-                      return nextValue;
-                    })
+                <ProtonPathPicker
+                  versions={protonVersions}
+                  selectedPath={selectedDefaultProtonPath}
+                  onChange={(value) => {
+                    setSelectedDefaultProtonPath(value);
+                    updateUserPreferences({ defaultProtonPath: value || null });
+                  }}
+                  radioName="default-proton-version"
+                  autoLabel={protonVersionAutoLabel}
+                  autoSourceDescription={protonSourceUmuDefault}
+                  steamSourceDescription={protonSourceSteam}
+                  compatibilityToolsSourceDescription={
+                    protonSourceCompatibilityTools
                   }
                 />
-
-                {!gamemodeAvailable && (
-                  <Tooltip id="settings-gamemode-unavailable-tooltip" />
-                )}
               </div>
+            )}
 
-              <div className="settings-context-compatibility__mangohud-toggle">
-                <CheckboxField
-                  label={
-                    <span
-                      className={`settings-context-compatibility__mangohud-label ${
-                        !mangohudAvailable
-                          ? "settings-context-compatibility__mangohud-label--disabled"
-                          : ""
-                      }`}
-                      data-tooltip-id={
-                        !mangohudAvailable
-                          ? "settings-mangohud-unavailable-tooltip"
-                          : undefined
-                      }
-                      data-tooltip-content={
-                        !mangohudAvailable
-                          ? tGameDetails("mangohud_not_available_tooltip", {
-                              defaultValue:
-                                "MangoHud is not available in your PATH",
-                            })
-                          : undefined
-                      }
-                    >
-                      <span>{tGameDetails("run_with_mangohud_prefix")}</span>
-                      <Link
-                        to={MANGOHUD_SITE_URL}
-                        className="settings-context-compatibility__mangohud-link"
+            {shouldShowLinuxCompatibilityTools && (
+              <div className="settings-context-compatibility__section settings-context-compatibility__global-toggles">
+                <h3 className="settings-context-compatibility__proton-title">
+                  {t("behavior")}
+                </h3>
+
+                <div className="settings-context-compatibility__gamemode-toggle">
+                  <CheckboxField
+                    label={
+                      <span
+                        className={`settings-context-compatibility__gamemode-label ${
+                          !gamemodeAvailable
+                            ? "settings-context-compatibility__gamemode-label--disabled"
+                            : ""
+                        }`}
+                        data-tooltip-id={
+                          !gamemodeAvailable
+                            ? "settings-gamemode-unavailable-tooltip"
+                            : undefined
+                        }
+                        data-tooltip-content={
+                          !gamemodeAvailable
+                            ? tGameDetails("gamemode_not_available_tooltip", {
+                                defaultValue:
+                                  "GameMode is not available in your PATH",
+                              })
+                            : undefined
+                        }
                       >
-                        MangoHud
-                        <LinkExternalIcon />
-                      </Link>
-                    </span>
-                  }
-                  checked={autoRunMangohud}
-                  disabled={!mangohudAvailable}
-                  onChange={() =>
-                    setAutoRunMangohud((previousValue) => {
-                      const nextValue = !previousValue;
-                      updateUserPreferences({ autoRunMangohud: nextValue });
-                      return nextValue;
-                    })
-                  }
-                />
+                        <span>{tGameDetails("run_with_gamemode_prefix")}</span>
+                        <Link
+                          to={GAMEMODE_SITE_URL}
+                          className="settings-context-compatibility__gamemode-link"
+                        >
+                          GameMode
+                          <LinkExternalIcon />
+                        </Link>
+                      </span>
+                    }
+                    checked={autoRunGamemode}
+                    disabled={!gamemodeAvailable}
+                    onChange={() =>
+                      setAutoRunGamemode((previousValue) => {
+                        const nextValue = !previousValue;
+                        updateUserPreferences({ autoRunGamemode: nextValue });
+                        return nextValue;
+                      })
+                    }
+                  />
 
-                {!mangohudAvailable && (
-                  <Tooltip id="settings-mangohud-unavailable-tooltip" />
-                )}
+                  {!gamemodeAvailable && (
+                    <Tooltip id="settings-gamemode-unavailable-tooltip" />
+                  )}
+                </div>
+
+                <div className="settings-context-compatibility__mangohud-toggle">
+                  <CheckboxField
+                    label={
+                      <span
+                        className={`settings-context-compatibility__mangohud-label ${
+                          !mangohudAvailable
+                            ? "settings-context-compatibility__mangohud-label--disabled"
+                            : ""
+                        }`}
+                        data-tooltip-id={
+                          !mangohudAvailable
+                            ? "settings-mangohud-unavailable-tooltip"
+                            : undefined
+                        }
+                        data-tooltip-content={
+                          !mangohudAvailable
+                            ? tGameDetails("mangohud_not_available_tooltip", {
+                                defaultValue:
+                                  "MangoHud is not available in your PATH",
+                              })
+                            : undefined
+                        }
+                      >
+                        <span>{tGameDetails("run_with_mangohud_prefix")}</span>
+                        <Link
+                          to={MANGOHUD_SITE_URL}
+                          className="settings-context-compatibility__mangohud-link"
+                        >
+                          MangoHud
+                          <LinkExternalIcon />
+                        </Link>
+                      </span>
+                    }
+                    checked={autoRunMangohud}
+                    disabled={!mangohudAvailable}
+                    onChange={() =>
+                      setAutoRunMangohud((previousValue) => {
+                        const nextValue = !previousValue;
+                        updateUserPreferences({ autoRunMangohud: nextValue });
+                        return nextValue;
+                      })
+                    }
+                  />
+
+                  {!mangohudAvailable && (
+                    <Tooltip id="settings-mangohud-unavailable-tooltip" />
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}

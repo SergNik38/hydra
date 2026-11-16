@@ -65,6 +65,10 @@ import { GameAssetsSettings } from "./game-assets-settings";
 import { debounce } from "lodash-es";
 import { levelDBService } from "@renderer/services/leveldb.service";
 import { getGameKey, getGameTitleFromExecutablePath } from "@renderer/helpers";
+import {
+  supportsLinuxCompatibilityTools,
+  supportsWinePrefix,
+} from "@renderer/helpers/compatibility-platform";
 import "./game-options-modal.scss";
 import { logger } from "@renderer/logger";
 import { GameOptionsSidebar } from "./game-options-modal/sidebar";
@@ -360,7 +364,7 @@ export function GameOptionsModal({
   }, [visible]);
 
   useEffect(() => {
-    if (!visible || globalThis.window.electron.platform !== "linux") {
+    if (!visible || !supportsWinePrefix(globalThis.window.electron.platform)) {
       setDefaultWinePrefixPath(null);
       return;
     }
@@ -974,8 +978,9 @@ export function GameOptionsModal({
     game.discs?.some((disc) => disc.isExecutable)
   );
   const showDownloadSettings = game.shop !== "custom";
-  const shouldShowWinePrefixConfiguration =
-    globalThis.window.electron.platform === "linux";
+  const shouldShowWinePrefixConfiguration = supportsWinePrefix(
+    globalThis.window.electron.platform
+  );
   const defaultHydraWinePrefixPath =
     game.shop !== "epic" && defaultWinePrefixPath
       ? `${defaultWinePrefixPath}/${game.objectId}`
@@ -1457,6 +1462,9 @@ export function GameOptionsModal({
               shouldShowWinePrefixConfiguration && (
                 <CompatibilitySettingsSection
                   game={game}
+                  showLinuxCompatibilityTools={supportsLinuxCompatibilityTools(
+                    globalThis.window.electron.platform
+                  )}
                   displayedWinePrefixPath={displayedWinePrefixPath}
                   winePrefixPlaceholder={
                     game.shop === "epic"
