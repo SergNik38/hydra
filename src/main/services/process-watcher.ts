@@ -425,9 +425,12 @@ export const watchProcesses = async () => {
       }
 
       if (platform === "darwin" && darwinCandidates) {
-        return hasDarwinProcessMatch(
-          darwinCandidates.get(matchPath) ?? [],
-          processMap
+        return (
+          hasDarwinProcessMatch(
+            darwinCandidates.get(matchPath) ?? [],
+            processMap
+          ) ||
+          hasLinuxCompatibilityProcessMatch(game, matchPath, linuxProcesses)
         );
       }
 

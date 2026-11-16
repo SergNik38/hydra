@@ -289,15 +289,20 @@ function buildMaps(processes) {
     const steamCompatDataPath = proc.environ && proc.environ.STEAM_COMPAT_DATA_PATH;
     if (steamCompatDataPath) winePrefixMap[value] = steamCompatDataPath;
 
-    if (platform === 'linux') {
-      const appImagePath = proc.environ && proc.environ.APPIMAGE;
+    if (platform === 'linux' || platform === 'darwin') {
+      const appImagePath = platform === 'linux' && proc.environ && proc.environ.APPIMAGE;
+      // macOS Wine games carry their prefix in WINEPREFIX; Linux uses the Steam
+      // compatibility variable. Both feed the same prefix matcher.
+      const compatPrefix =
+        steamCompatDataPath ||
+        (platform === 'darwin' && proc.environ && proc.environ.WINEPREFIX);
       linuxProcesses.push({
         name: key,
         cwd: (proc.cwd || '').toLowerCase(),
         exe: (proc.exe || '').toLowerCase(),
         pid: proc.pid,
         appImagePath: appImagePath ? appImagePath.toLowerCase() : null,
-        steamCompatDataPath: steamCompatDataPath ? steamCompatDataPath.toLowerCase() : null,
+        steamCompatDataPath: compatPrefix ? compatPrefix.toLowerCase() : null,
       });
     }
 

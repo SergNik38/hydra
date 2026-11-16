@@ -8,6 +8,7 @@ import path from "node:path";
 import { NativeAddon } from "@main/services/native-addon";
 import { processReferencesExecutable } from "@main/services/linux-process-match";
 import { isWindowsBatchFile } from "@main/helpers/windows-batch-command";
+import { closeDarwinWineGame } from "@main/helpers/darwin-wine-close";
 
 const getKillCommand = (pid: number) => {
   if (process.platform == "win32") {
@@ -40,6 +41,16 @@ const closeGame = async (
   const game = await gamesSublevel.get(levelKeys.game(shop, objectId));
 
   if (!game) return;
+
+  if (
+    await closeDarwinWineGame({
+      executablePath: game.executablePath,
+      winePrefixPath: game.winePrefixPath,
+      objectId: game.objectId,
+    })
+  ) {
+    return;
+  }
 
   const launchedPid = launchedGamePids.get(levelKeys.game(shop, objectId));
   const trackingPaths = game.trackingExecutablePaths?.filter(Boolean) ?? [];
