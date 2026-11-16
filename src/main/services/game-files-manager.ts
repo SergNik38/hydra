@@ -1,6 +1,7 @@
 import { ASSETS_PATH } from "@main/constants";
 import { getGameAssets } from "@main/events/catalogue/get-game-assets";
 import { getDirectorySize } from "@main/events/helpers/get-directory-size";
+import { createDarwinUrlShortcut } from "@main/helpers/darwin-url-shortcut";
 import { findGameExecutableInFolder } from "@main/helpers/find-game-executable";
 import { findDownloadInstaller } from "@main/helpers/find-game-installer";
 import {
@@ -1233,7 +1234,9 @@ export class GameFilesManager {
   private async createDesktopShortcutForGame(gameTitle: string): Promise<void> {
     try {
       const supportsShortcutPref =
-        process.platform === "win32" || process.platform === "linux";
+        process.platform === "win32" ||
+        process.platform === "linux" ||
+        process.platform === "darwin";
 
       if (supportsShortcutPref) {
         const userPreferences = await db.get<string, UserPreferences | null>(
@@ -1287,6 +1290,19 @@ export class GameFilesManager {
         if (startMenuSuccess) {
           logger.info(
             `[GameFilesManager] Created Start Menu shortcut for ${this.objectId}`
+          );
+        }
+      } else if (process.platform === "darwin") {
+        const desktopSuccess = createDarwinUrlShortcut({
+          outputDir: SystemPath.getPath("desktop"),
+          name: shortcutName,
+          url: deepLink,
+          legacySymlinkTarget: process.execPath,
+        });
+
+        if (desktopSuccess) {
+          logger.info(
+            `[GameFilesManager] Created desktop shortcut for ${this.objectId}`
           );
         }
       } else {

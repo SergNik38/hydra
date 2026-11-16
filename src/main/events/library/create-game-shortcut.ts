@@ -11,6 +11,7 @@ import { gamesSublevel, levelKeys } from "@main/level";
 import { SystemPath } from "@main/services/system-path";
 import { ASSETS_PATH } from "@main/constants";
 import { getGameAssets } from "../catalogue/get-game-assets";
+import { createDarwinUrlShortcut } from "@main/helpers/darwin-url-shortcut";
 import { logger } from "@main/services";
 import {
   buildRunDeepLink,
@@ -255,6 +256,21 @@ const createGameShortcut = async (
       throw new Error(
         `Failed to create ${locationName} shortcut in ${outputPath}.`
       );
+    }
+
+    return true;
+  }
+
+  if (process.platform === "darwin") {
+    const success = createDarwinUrlShortcut({
+      outputDir: outputPath,
+      name: shortcutName,
+      url: deepLink,
+      legacySymlinkTarget: shortcutTarget.executablePath,
+    });
+
+    if (!success) {
+      throw new Error("Failed to create desktop shortcut.");
     }
 
     return true;
