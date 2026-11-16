@@ -14,6 +14,7 @@ ludusavi/**
 !ludusavi/config.yaml
 /hydra-native/
 /legendary/
+build/native/
 native/hydra-native/target/
 native/epic-prerequisite-runner/target/
 binaries/epic-prerequisite-runner/

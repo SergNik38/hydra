@@ -23,7 +23,13 @@ function getLegendaryArtifact(platform, arch) {
     throw new Error(`Unsupported Legendary architecture: ${arch}`);
   }
 
-  const artifact = manifest.artifacts?.[platform]?.[arch];
+  // Legendary publishes no macOS arm64 build. The x64 binary runs under
+  // Rosetta, which Hydra already requires for Wine on Apple Silicon.
+  const artifact =
+    manifest.artifacts?.[platform]?.[arch] ??
+    (platform === "darwin" && arch === "arm64"
+      ? manifest.artifacts?.darwin?.x64
+      : undefined);
   if (!artifact || !/^[a-f0-9]{64}$/.test(artifact.sha256)) {
     throw new Error(`Invalid Legendary artifact manifest: ${platform}/${arch}`);
   }

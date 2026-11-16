@@ -6,6 +6,12 @@ const { buildTorrentBridge } = require("./build-torrent-bridge.cjs");
 const {
   installPrebuiltTorrentBridge,
 } = require("./torrent-bridge-prebuilt.cjs");
+const {
+  getNativeTargetArch,
+  getNativeOutputDir,
+  getNativeStageDir,
+} = require("./native-target-arch.cjs");
+const { withDarwinBridgeTarget } = require("./darwin-bridge-target.cjs");
 
 const execFile = util.promisify(childProcess.execFile);
 const MAX_COMMAND_OUTPUT_BYTES = 10 * 1024 * 1024;
@@ -25,13 +31,21 @@ const cargoTargetDir = path.join(
   "hydra-native",
   "target"
 );
-const outputDir = path.join(projectRoot, "hydra-native");
+
+const targetArch = getNativeTargetArch();
+const isCrossBuild = targetArch !== process.arch;
+const outputDir = getNativeOutputDir();
 const outputNodePath = path.join(outputDir, "hydra-native.node");
 
 const sourceLibraryNameByPlatform = {
   linux: "libhydra_native.so",
   darwin: "libhydra_native.dylib",
   win32: "hydra_native.dll",
+};
+
+const rustTargetByPlatform = {
+  win32: { x64: "x86_64-pc-windows-msvc", arm64: "aarch64-pc-windows-msvc" },
+  darwin: { x64: "x86_64-apple-darwin", arm64: "aarch64-apple-darwin" },
 };
 
 const run = async (command, args, options = {}) => {
@@ -135,19 +149,18 @@ const build = async () => {
     );
   }
 
-  const target =
-    process.platform === "win32"
-      ? { x64: "x86_64-pc-windows-msvc", arm64: "aarch64-pc-windows-msvc" }[
-          process.arch
-        ]
-      : undefined;
-  if (process.platform === "win32" && !target) {
-    throw new Error(`Unsupported Windows architecture: ${process.arch}`);
+  const target = rustTargetByPlatform[process.platform]?.[targetArch];
+  if (rustTargetByPlatform[process.platform] && !target) {
+    throw new Error(
+      `Unsupported ${process.platform} architecture: ${targetArch}`
+    );
   }
 
   console.log("Building hydra-native Rust addon...");
-  const torrentLibraryDir =
-    installPrebuiltTorrentBridge() ?? buildTorrentBridge();
+  const torrentLibraryDir = await withDarwinBridgeTarget(
+    targetArch,
+    () => installPrebuiltTorrentBridge() ?? buildTorrentBridge()
+  );
 
   const cargoArgs = [
     "build",
@@ -185,22 +198,37 @@ const build = async () => {
   await copySidecarLibrariesOnWindows();
   await ensureDepsResolvableOnLinux();
 
-  // Verify with the actual application runtime, not a potentially incompatible
-  // system Node.js. Fail installation before the user opens the download UI.
-  await waitForElectron();
-  await run(
-    require("electron"),
-    [
-      "-e",
-      "try { require(process.argv[1]); } catch (error) { console.error('Electron cannot load the native addon:', error.message); process.exit(1); }",
-      outputNodePath,
-    ],
-    {
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
-      timeout: NATIVE_LOAD_TIMEOUT_MS,
-      windowsHide: true,
-    }
-  );
+  if (process.platform === "darwin" && !isCrossBuild) {
+    // Keep ./hydra-native for the dev app and stage the same set for packaging.
+    const stageDir = getNativeStageDir(targetArch);
+    fs.rmSync(stageDir, { recursive: true, force: true });
+    fs.cpSync(outputDir, stageDir, { recursive: true });
+  }
+
+  if (isCrossBuild) {
+    // A foreign-arch binary cannot load on this host, so the check cannot run.
+    console.log(
+      `Skipping the Electron load check: the ${targetArch} addon cannot load on ${process.arch}.`
+    );
+  } else {
+    // Verify with the actual application runtime, not a potentially
+    // incompatible system Node.js. Fail installation before the user opens the
+    // download UI.
+    await waitForElectron();
+    await run(
+      require("electron"),
+      [
+        "-e",
+        "try { require(process.argv[1]); } catch (error) { console.error('Electron cannot load the native addon:', error.message); process.exit(1); }",
+        outputNodePath,
+      ],
+      {
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+        timeout: NATIVE_LOAD_TIMEOUT_MS,
+        windowsHide: true,
+      }
+    );
+  }
 
   console.log(`Hydra native addon ready at ${outputNodePath}`);
 };
