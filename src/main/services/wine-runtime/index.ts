@@ -1,0 +1,150 @@
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { logger } from "@main/services";
+import { SystemPath } from "../system-path";
+import { downloadVerified, type DownloadProgressCallback } from "./download";
+import { installArchive } from "./install";
+import { wineRuntimeManifest } from "./manifest";
+import { isRosettaAvailable, needsRosetta } from "./rosetta";
+import { readWineRuntimeState, writeWineRuntimeState } from "./state";
+
+export type WineRuntimeStatus =
+  | "unsupported"
+  | "missing"
+  | "installing"
+  | "ready"
+  | "needs-rosetta";
+
+const MANAGED_DIRECTORY_NAME = "wine-runtime";
+const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+const DOWNLOAD_SIZE_HEADROOM = 1.25;
+
+const isSupported = () => process.platform === "darwin";
+
+const getManagedDirectory = () =>
+  path.join(SystemPath.getPath("userData"), MANAGED_DIRECTORY_NAME);
+
+const isExecutableFile = (filePath: string) => {
+  try {
+    const stat = fs.statSync(filePath);
+    return stat.isFile() && (stat.mode & 0o111) !== 0;
+  } catch {
+    return false;
+  }
+};
+
+const resolveInstalledBinaryPath = (): string | null => {
+  const state = readWineRuntimeState(getManagedDirectory());
+  if (!state || state.version !== wineRuntimeManifest.version) return null;
+
+  const versionDirectory = path.join(getManagedDirectory(), state.version);
+  const binaryPath = path.resolve(versionDirectory, state.binaryRelativePath);
+  if (!binaryPath.startsWith(`${versionDirectory}${path.sep}`)) return null;
+
+  return isExecutableFile(binaryPath) ? binaryPath : null;
+};
+
+const removeOtherVersions = async (keptVersion: string) => {
+  const managedDirectory = getManagedDirectory();
+  const entries = await fs.promises
+    .readdir(managedDirectory, { withFileTypes: true })
+    .catch(() => [] as fs.Dirent[]);
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory() && entry.name !== keptVersion)
+      .map((entry) =>
+        fs.promises
+          .rm(path.join(managedDirectory, entry.name), {
+            recursive: true,
+            force: true,
+          })
+          .catch(() => undefined)
+      )
+  );
+};
+
+export class WineRuntime {
+  private static installPromise: Promise<void> | null = null;
+
+  public static async getStatus(): Promise<WineRuntimeStatus> {
+    if (!isSupported()) return "unsupported";
+    if (this.installPromise) return "installing";
+    if (needsRosetta() && !(await isRosettaAvailable())) {
+      return "needs-rosetta";
+    }
+    return resolveInstalledBinaryPath() ? "ready" : "missing";
+  }
+
+  public static getWineBinaryPath(): string | null {
+    if (!isSupported()) return null;
+    return resolveInstalledBinaryPath();
+  }
+
+  public static ensureInstalled(
+    onProgress?: DownloadProgressCallback
+  ): Promise<void> {
+    if (!isSupported()) return Promise.resolve();
+    this.installPromise ??= this.runInstall(onProgress).finally(() => {
+      this.installPromise = null;
+    });
+    return this.installPromise;
+  }
+
+  private static async runInstall(
+    onProgress?: DownloadProgressCallback
+  ): Promise<void> {
+    if (resolveInstalledBinaryPath()) {
+      await removeOtherVersions(wineRuntimeManifest.version);
+      return;
+    }
+
+    if (needsRosetta() && !(await isRosettaAvailable())) {
+      throw new Error(
+        "Rosetta 2 is required to run the macOS Wine runtime on Apple Silicon"
+      );
+    }
+
+    const { version, artifact } = wineRuntimeManifest;
+    const managedDirectory = getManagedDirectory();
+    const archivePath = path.join(
+      managedDirectory,
+      `.${artifact.fileName}.${randomUUID()}.download`
+    );
+
+    try {
+      logger.info("Downloading Wine runtime", { version });
+      await downloadVerified({
+        url: artifact.url,
+        sha256: artifact.sha256,
+        maxBytes: Math.ceil(artifact.sizeBytes * DOWNLOAD_SIZE_HEADROOM),
+        destination: archivePath,
+        timeoutMs: DOWNLOAD_TIMEOUT_MS,
+        onProgress,
+      });
+
+      logger.info("Installing Wine runtime", { version });
+      const { binaryRelativePath } = await installArchive({
+        archivePath,
+        versionDir: path.join(getManagedDirectory(), version),
+      });
+
+      await writeWineRuntimeState(managedDirectory, {
+        version,
+        binaryRelativePath,
+        installedAt: Date.now(),
+      });
+      await removeOtherVersions(version);
+      logger.info("Wine runtime installed", { version, binaryRelativePath });
+    } catch (error) {
+      logger.warn("Failed to install Wine runtime", {
+        version,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    } finally {
+      await fs.promises.rm(archivePath, { force: true }).catch(() => undefined);
+    }
+  }
+}
