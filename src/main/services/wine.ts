@@ -13,7 +13,7 @@ export class Wine {
   private static configuredDefaultPrefixPath: string | null = null;
 
   private static getBuiltInDefaultPrefixPath(): string | null {
-    if (process.platform !== "linux") {
+    if (process.platform !== "linux" && process.platform !== "darwin") {
       return null;
     }
 

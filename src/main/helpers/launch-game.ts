@@ -47,6 +47,7 @@ import {
 import { isGamemodeAvailable } from "./is-gamemode-available";
 import { isMangohudAvailable } from "./is-mangohud-available";
 import { resolveLaunchCommand } from "./resolve-launch-command";
+import { prepareDarwinWinePrefix } from "./darwin-wine-launch";
 import {
   buildWindowsBatchCommand,
   isWindowsBatchFile,
@@ -99,6 +100,9 @@ const createUmuStatusReporter =
 
 const isWindowsExecutable = (executablePath: string) =>
   path.extname(executablePath).toLowerCase() === ".exe";
+
+const hasWindowsCompatibilityLayer = () =>
+  process.platform === "linux" || process.platform === "darwin";
 
 const ensureExecutablePermission = (executablePath: string) => {
   try {
@@ -205,11 +209,12 @@ const launchWithWine = async (
   launchOptions?: string | null,
   useMangohud = false,
   useGamemode = false,
-  winePrefixPath?: string | null
+  winePrefixPath?: string | null,
+  wineCommand = "wine"
 ): Promise<boolean> => {
   const workingDirectory = path.dirname(executablePath);
   const resolvedLaunchCommand = resolveLaunchCommand({
-    baseCommand: "wine",
+    baseCommand: wineCommand,
     baseArgs: [executablePath],
     launchOptions,
     wrapperCommands: [
@@ -302,12 +307,19 @@ const prepareWinePrefixIfNeeded = async (
   if (prefixWasReadyForRestore) return false;
 
   try {
-    await Umu.preparePrefix({
-      winePrefixPath: context.winePrefixPath!,
-      protonPath: context.protonPath,
-      gameId: objectId,
-      onStatus: createUmuStatusReporter(gameKey),
-    });
+    if (process.platform === "darwin") {
+      await prepareDarwinWinePrefix(
+        context.winePrefixPath!,
+        createUmuStatusReporter(gameKey)
+      );
+    } else {
+      await Umu.preparePrefix({
+        winePrefixPath: context.winePrefixPath!,
+        protonPath: context.protonPath,
+        gameId: objectId,
+        onStatus: createUmuStatusReporter(gameKey),
+      });
+    }
     return false;
   } catch (error) {
     logger.error("Failed to prepare Wine prefix before cloud save restore", {
@@ -493,6 +505,55 @@ const launchWindowsBinaryOnLinux = async (
   return false;
 };
 
+const launchWindowsBinaryOnDarwin = async (
+  gameKey: string,
+  parsedPath: string,
+  compatibilityContext: LinuxCompatibilityLaunchContext,
+  launchOptions: string | null | undefined
+): Promise<boolean> => {
+  const winePrefixPath = compatibilityContext.winePrefixPath;
+  const report = createUmuStatusReporter(gameKey);
+
+  if (!winePrefixPath) {
+    report({ type: "failed", message: "Wine prefix is not available" });
+    return false;
+  }
+
+  try {
+    const wineBinaryPath = await prepareDarwinWinePrefix(
+      winePrefixPath,
+      report
+    );
+    const launched = await launchWithWine(
+      parsedPath,
+      launchOptions,
+      false,
+      false,
+      winePrefixPath,
+      wineBinaryPath
+    );
+
+    if (!launched) {
+      report({ type: "failed", message: "Wine failed to launch the game" });
+      return false;
+    }
+
+    report({ type: "ready" });
+    PowerSaveBlockerManager.markCompatibilityLaunchStarted(gameKey);
+    return true;
+  } catch (error) {
+    logger.error("Failed to launch game with the macOS Wine runtime", error);
+    report({
+      type: "failed",
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to launch the game with Wine",
+    });
+    return false;
+  }
+};
+
 interface PreparedLinuxCompatibility {
   context: LinuxCompatibilityLaunchContext | null;
   prefixReadyForRestore: boolean;
@@ -534,7 +595,7 @@ const prepareLinuxCompatibilityForLaunch = async (
   shop: GameShop,
   shouldPrepareForCloudSave: boolean
 ): Promise<PreparedLinuxCompatibility> => {
-  if (process.platform !== "linux" || !isWindowsExecutable(parsedPath)) {
+  if (!hasWindowsCompatibilityLayer() || !isWindowsExecutable(parsedPath)) {
     return {
       context: null,
       prefixReadyForRestore: true,
@@ -547,7 +608,10 @@ const prepareLinuxCompatibilityForLaunch = async (
     objectId
   );
   let context: LinuxCompatibilityLaunchContext = {
-    protonPath: await resolveProtonPathForLaunch(game?.protonPath),
+    protonPath:
+      process.platform === "darwin"
+        ? null
+        : await resolveProtonPathForLaunch(game?.protonPath),
     winePrefixPath: await Wine.resolvePrefixPath(requestedWinePrefixPath),
   };
   logger.info("[Cloud Save] Resolved authoritative launch prefix", {
@@ -627,6 +691,22 @@ const launchResolvedGame = async (
   useGamemode: boolean,
   shortcut: ExecutableShortcut | null = null
 ) => {
+  if (process.platform === "darwin" && isWindowsExecutable(parsedPath)) {
+    if (!compatibilityContext) {
+      clearCloudSaveLaunchGuard(objectId, shop);
+      return null;
+    }
+
+    const launched = await launchWindowsBinaryOnDarwin(
+      gameKey,
+      parsedPath,
+      compatibilityContext,
+      launchOptions
+    );
+    if (!launched) clearCloudSaveLaunchGuard(objectId, shop);
+    return null;
+  }
+
   if (process.platform !== "linux") {
     return launchNatively(
       parsedPath,
