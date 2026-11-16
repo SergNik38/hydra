@@ -1,7 +1,7 @@
 import { ASSETS_PATH } from "@main/constants";
 import { getGameAssets } from "@main/events/catalogue/get-game-assets";
 import { getDirectorySize } from "@main/events/helpers/get-directory-size";
-import { createDarwinUrlShortcut } from "@main/helpers/darwin-url-shortcut";
+import { createDarwinAppShortcut } from "@main/helpers/darwin-url-shortcut";
 import { findGameExecutableInFolder } from "@main/helpers/find-game-executable";
 import { findDownloadInstaller } from "@main/helpers/find-game-installer";
 import {
@@ -1293,11 +1293,12 @@ export class GameFilesManager {
           );
         }
       } else if (process.platform === "darwin") {
-        const desktopSuccess = createDarwinUrlShortcut({
+        const desktopSuccess = createDarwinAppShortcut({
           outputDir: SystemPath.getPath("desktop"),
           name: shortcutName,
           url: deepLink,
           legacySymlinkTarget: process.execPath,
+          iconPngPath: iconPath,
         });
 
         if (desktopSuccess) {

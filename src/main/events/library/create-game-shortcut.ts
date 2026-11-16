@@ -11,7 +11,7 @@ import { gamesSublevel, levelKeys } from "@main/level";
 import { SystemPath } from "@main/services/system-path";
 import { ASSETS_PATH } from "@main/constants";
 import { getGameAssets } from "../catalogue/get-game-assets";
-import { createDarwinUrlShortcut } from "@main/helpers/darwin-url-shortcut";
+import { createDarwinAppShortcut } from "@main/helpers/darwin-url-shortcut";
 import { logger } from "@main/services";
 import {
   buildRunDeepLink,
@@ -262,11 +262,12 @@ const createGameShortcut = async (
   }
 
   if (process.platform === "darwin") {
-    const success = createDarwinUrlShortcut({
+    const success = createDarwinAppShortcut({
       outputDir: outputPath,
       name: shortcutName,
       url: deepLink,
       legacySymlinkTarget: shortcutTarget.executablePath,
+      iconPngPath: iconPath,
     });
 
     if (!success) {

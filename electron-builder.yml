@@ -79,6 +79,10 @@ portable:
 mac:
   sign: scripts/legendary-mac-sign.cjs
   entitlementsInherit: build/entitlements.mac.plist
+  protocols:
+    - name: Hydra
+      schemes:
+        - hydralauncher
   extraResources:
     - from: legendary/darwin/${arch}
       to: legendary
