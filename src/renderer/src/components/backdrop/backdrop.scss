@@ -25,6 +25,35 @@
   &--windows {
     padding-top: calc(#{globals.$spacing-unit * 3} + 35);
   }
+
+  // A full-window backdrop blur re-rendered every frame of the fade is very
+  // expensive on Mac GPUs, and the 2px blur is barely visible. Fade the dimming
+  // on a pseudo-element instead of the element itself so the modal child is
+  // not faded twice.
+  &--darwin {
+    animation: none;
+    background-color: transparent;
+    backdrop-filter: none;
+    transition: none;
+
+    // Negative z-index keeps the dim behind the backdrop's content while the
+    // backdrop's own stacking context keeps it above the page.
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background-color: rgba(0, 0, 0, 0.7);
+      pointer-events: none;
+      animation: backdrop-fade-in-darwin 0.4s ease;
+      will-change: opacity;
+    }
+
+    &.backdrop--closing::before {
+      // `forwards` keeps the dim transparent once the fade-out ends.
+      animation: backdrop-fade-out-darwin 0.4s ease forwards;
+    }
+  }
 }
 
 @keyframes backdrop-fade-in {
@@ -46,5 +75,23 @@
   100% {
     backdrop-filter: blur(0px);
     background-color: rgba(0, 0, 0, 0);
+  }
+}
+
+@keyframes backdrop-fade-in-darwin {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes backdrop-fade-out-darwin {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
   }
 }
