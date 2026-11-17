@@ -20,6 +20,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { getNativeStageDir } = require("./native-target-arch.cjs");
+const { ensureMacArm64OptionalDeps } = require("./mac-arm64-optional-deps.cjs");
 
 const root = path.resolve(__dirname, "..");
 const MAC_ARCHS = ["x64", "arm64"];
@@ -84,6 +85,14 @@ if (missingArchs.length > 0) {
       ),
     ].join("\n")
   );
+}
+
+// Yarn 1 only installs the host's optional packages, so building on an Intel
+// Mac leaves sharp's darwin-arm64 natives out of node_modules.
+try {
+  ensureMacArm64OptionalDeps({ projectDir: root });
+} catch (error) {
+  fail(`Could not install sharp's darwin-arm64 packages: ${error.message}`);
 }
 
 const binaryPath = (name) =>
