@@ -31,6 +31,7 @@
     "build:unpack": "npm run build:native && npm run build && electron-builder --dir",
     "build:win": "npm run build:native && electron-vite build && electron-builder --win",
     "build:mac": "npm run build:native && electron-vite build && electron-builder --mac",
+    "build:mac-release": "node ./scripts/build-mac-release.cjs",
     "build:linux": "npm run build:native && electron-vite build && electron-builder --linux",
     "dev:big-picture": "vite dev src/big-picture",
     "prepare": "husky"

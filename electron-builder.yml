@@ -102,8 +102,14 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+  # macOS builds ship from this fork: upstream publishes no mac artifacts, so
+  # the global feed above would 404 on latest-mac.yml.
+  publish:
+    provider: github
+    owner: SergNik38
+    repo: hydra
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 linux:
   extraResources:
     - from: binaries/epic-prerequisite-runner/x64

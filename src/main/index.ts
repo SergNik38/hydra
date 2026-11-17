@@ -61,6 +61,7 @@ import {
   resumeEpicPlaytime,
 } from "./services/epic";
 import { removeAppImageLibraryPath } from "./helpers/remove-appimage-library-path";
+import { getUpdateFeed } from "./helpers/update-feed";
 
 if (process.platform === "linux") removeAppImageLibraryPath();
 
@@ -70,11 +71,7 @@ crashReporter.start({
 
 const { autoUpdater } = updater;
 
-autoUpdater.setFeedURL({
-  provider: "github",
-  owner: "hydralauncher",
-  repo: "hydra",
-});
+autoUpdater.setFeedURL(getUpdateFeed(process.platform));
 
 autoUpdater.logger = logger;
 

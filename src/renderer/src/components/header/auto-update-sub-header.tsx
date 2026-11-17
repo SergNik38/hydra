@@ -4,9 +4,9 @@ import { SyncIcon } from "@primer/octicons-react";
 import { Link } from "../link/link";
 import "./auto-update-header.scss";
 import type { AppUpdaterEvent } from "@types";
+import { getReleasesPageUrl } from "@renderer/helpers/releases-page-url";
 
-export const releasesPageUrl =
-  "https://github.com/hydralauncher/hydra/releases/latest";
+export const releasesPageUrl = getReleasesPageUrl(window.electron.platform);
 
 export function AutoUpdateSubHeader() {
   const [isReadyToInstall, setIsReadyToInstall] = useState(false);
