@@ -8,10 +8,10 @@
 
 [![Latest release](https://img.shields.io/github/v/release/SergNik38/hydra?label=release)](https://github.com/SergNik38/hydra/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/SergNik38/hydra/total)](https://github.com/SergNik38/hydra/releases)
-[![macOS](https://img.shields.io/badge/macOS-Intel-black?logo=apple)](https://github.com/SergNik38/hydra/releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-Intel%20%7C%20Apple%20Silicon-black?logo=apple)](https://github.com/SergNik38/hydra/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-**[⬇️ Download for macOS (Intel)](https://github.com/SergNik38/hydra/releases/latest)**
+**[⬇️ Download for macOS (Intel & Apple Silicon)](https://github.com/SergNik38/hydra/releases/latest)**
 
 ![Hydra Launcher](./docs/screenshot.png)
 
@@ -46,7 +46,7 @@ The first Windows game you start downloads the Wine runtime (~190 MB) once.
 
 ## Requirements
 
-- macOS on an Intel Mac (Apple Silicon build is coming; Windows games will run there through Rosetta 2).
+- macOS on an Intel or Apple Silicon Mac. On Apple Silicon, Windows games run through Rosetta 2 (macOS offers to install it on the first Windows game launch).
 - Internet connection for the catalogue, sign-in and the one-time Wine download.
 
 ## Status and known limitations
@@ -54,7 +54,7 @@ The first Windows game you start downloads the Wine runtime (~190 MB) once.
 | Area | Status |
 |---|---|
 | Intel Macs | ✅ Released |
-| Apple Silicon | 🧪 Builds, testing in progress |
+| Apple Silicon | ✅ Released |
 | Windows games via Wine | ✅ Launch, tracking, stop, installers |
 | Cloud saves in Wine prefixes | ✅ |
 | Epic Games Store integration | ❌ Not supported on macOS yet |
@@ -99,7 +99,7 @@ yarn build:mac-release 4.4.1001    # writes the .dmg files and latest-mac.yml to
 
 ## Contributing
 
-Issues and pull requests are welcome, especially game compatibility reports and Apple Silicon testing. When reporting a game problem, please include the game, the macOS version, your Mac's chip and the Hydra log from `~/Library/Application Support/hydralauncher/logs/`.
+Issues and pull requests are welcome, especially game compatibility reports. When reporting a game problem, please include the game, the macOS version, your Mac's chip and the Hydra log from `~/Library/Application Support/hydralauncher/logs/`.
 
 ## Credits
 
