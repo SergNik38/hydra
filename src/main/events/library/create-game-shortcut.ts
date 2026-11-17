@@ -267,7 +267,7 @@ const createGameShortcut = async (
       name: shortcutName,
       url: deepLink,
       legacySymlinkTarget: shortcutTarget.executablePath,
-      iconPngPath: iconPath,
+      iconPath,
     });
 
     if (!success) {
