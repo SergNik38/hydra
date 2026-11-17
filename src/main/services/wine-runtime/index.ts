@@ -4,8 +4,13 @@ import { randomUUID } from "node:crypto";
 import { logger } from "@main/services";
 import { SystemPath } from "../system-path";
 import { downloadVerified, type DownloadProgressCallback } from "./download";
+import {
+  DXVK_DIRECTORY_NAME,
+  ensureDxvkInstalled,
+  findInstalledDxvkDirectory,
+} from "./dxvk";
 import { installArchive } from "./install";
-import { wineRuntimeManifest } from "./manifest";
+import { dxvkManifest, wineRuntimeManifest } from "./manifest";
 import { isRosettaAvailable, needsRosetta } from "./rosetta";
 import { readWineRuntimeState, writeWineRuntimeState } from "./state";
 
@@ -53,7 +58,12 @@ const removeOtherVersions = async (keptVersion: string) => {
 
   await Promise.all(
     entries
-      .filter((entry) => entry.isDirectory() && entry.name !== keptVersion)
+      .filter(
+        (entry) =>
+          entry.isDirectory() &&
+          entry.name !== keptVersion &&
+          entry.name !== DXVK_DIRECTORY_NAME
+      )
       .map((entry) =>
         fs.promises
           .rm(path.join(managedDirectory, entry.name), {
@@ -82,6 +92,16 @@ export class WineRuntime {
     return resolveInstalledBinaryPath();
   }
 
+  public static getDxvkDirectory(): string | null {
+    if (!isSupported()) return null;
+
+    const managedDirectory = getManagedDirectory();
+    const state = readWineRuntimeState(managedDirectory);
+    if (!state) return null;
+
+    return findInstalledDxvkDirectory(managedDirectory, state.dxvkVersion);
+  }
+
   public static ensureInstalled(
     onProgress?: DownloadProgressCallback
   ): Promise<void> {
@@ -95,56 +115,75 @@ export class WineRuntime {
   private static async runInstall(
     onProgress?: DownloadProgressCallback
   ): Promise<void> {
-    if (resolveInstalledBinaryPath()) {
-      await removeOtherVersions(wineRuntimeManifest.version);
-      return;
-    }
-
-    if (needsRosetta() && !(await isRosettaAvailable())) {
-      throw new Error(
-        "Rosetta 2 is required to run the macOS Wine runtime on Apple Silicon"
-      );
-    }
-
-    const { version, artifact } = wineRuntimeManifest;
     const managedDirectory = getManagedDirectory();
-    const archivePath = path.join(
-      managedDirectory,
-      `.${artifact.fileName}.${randomUUID()}.download`
-    );
+
+    if (!resolveInstalledBinaryPath()) {
+      if (needsRosetta() && !(await isRosettaAvailable())) {
+        throw new Error(
+          "Rosetta 2 is required to run the macOS Wine runtime on Apple Silicon"
+        );
+      }
+
+      const { version, artifact } = wineRuntimeManifest;
+      const archivePath = path.join(
+        managedDirectory,
+        `.${artifact.fileName}.${randomUUID()}.download`
+      );
+
+      try {
+        logger.info("Downloading Wine runtime", { version });
+        await downloadVerified({
+          url: artifact.url,
+          sha256: artifact.sha256,
+          maxBytes: Math.ceil(artifact.sizeBytes * DOWNLOAD_SIZE_HEADROOM),
+          destination: archivePath,
+          timeoutMs: DOWNLOAD_TIMEOUT_MS,
+          onProgress,
+        });
+
+        logger.info("Installing Wine runtime", { version });
+        const { binaryRelativePath } = await installArchive({
+          archivePath,
+          versionDir: path.join(managedDirectory, version),
+        });
+
+        await writeWineRuntimeState(managedDirectory, {
+          version,
+          binaryRelativePath,
+          installedAt: Date.now(),
+        });
+        logger.info("Wine runtime installed", { version, binaryRelativePath });
+      } catch (error) {
+        logger.warn("Failed to install Wine runtime", {
+          version,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+        throw error;
+      } finally {
+        await fs.promises
+          .rm(archivePath, { force: true })
+          .catch(() => undefined);
+      }
+    }
+
+    const dxvkMissing = WineRuntime.getDxvkDirectory() === null;
 
     try {
-      logger.info("Downloading Wine runtime", { version });
-      await downloadVerified({
-        url: artifact.url,
-        sha256: artifact.sha256,
-        maxBytes: Math.ceil(artifact.sizeBytes * DOWNLOAD_SIZE_HEADROOM),
-        destination: archivePath,
-        timeoutMs: DOWNLOAD_TIMEOUT_MS,
-        onProgress,
-      });
-
-      logger.info("Installing Wine runtime", { version });
-      const { binaryRelativePath } = await installArchive({
-        archivePath,
-        versionDir: path.join(getManagedDirectory(), version),
-      });
-
-      await writeWineRuntimeState(managedDirectory, {
-        version,
-        binaryRelativePath,
-        installedAt: Date.now(),
-      });
-      await removeOtherVersions(version);
-      logger.info("Wine runtime installed", { version, binaryRelativePath });
+      if (dxvkMissing) {
+        logger.info("Installing DXVK", { version: dxvkManifest.version });
+      }
+      await ensureDxvkInstalled({ managedDirectory, onProgress });
+      if (dxvkMissing) {
+        logger.info("DXVK installed", { version: dxvkManifest.version });
+      }
     } catch (error) {
-      logger.warn("Failed to install Wine runtime", {
-        version,
+      logger.warn("Failed to install DXVK", {
+        version: dxvkManifest.version,
         errorMessage: error instanceof Error ? error.message : String(error),
       });
       throw error;
-    } finally {
-      await fs.promises.rm(archivePath, { force: true }).catch(() => undefined);
     }
+
+    await removeOtherVersions(wineRuntimeManifest.version);
   }
 }

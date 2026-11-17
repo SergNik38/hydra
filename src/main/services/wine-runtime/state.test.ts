@@ -45,6 +45,21 @@ describe("wine runtime state", () => {
     });
   });
 
+  it("round-trips the optional dxvk version", async () => {
+    await withTempDir(async (directory) => {
+      const state = {
+        version: "staging-11.18",
+        binaryRelativePath: path.join("wine", "bin", "wine64"),
+        installedAt: 1_700_000_000_000,
+        dxvkVersion: "1.10.3-20230507-repack",
+      };
+
+      await writeWineRuntimeState(directory, state);
+
+      assert.deepEqual(readWineRuntimeState(directory), state);
+    });
+  });
+
   it("returns null for a missing state file", async () => {
     await withTempDir(async (directory) => {
       assert.equal(readWineRuntimeState(directory), null);
@@ -74,6 +89,15 @@ describe("wine runtime state", () => {
         version: "staging-11.18",
         binaryRelativePath: "wine",
         installedAt: Number.NaN,
+      }),
+      null
+    );
+    assert.equal(
+      parseWineRuntimeState({
+        version: "staging-11.18",
+        binaryRelativePath: "wine",
+        installedAt: 1,
+        dxvkVersion: "",
       }),
       null
     );

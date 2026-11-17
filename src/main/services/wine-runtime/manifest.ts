@@ -31,25 +31,25 @@ const isHttpsUrl = (value: unknown): value is string => {
 const isPositiveNumber = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value) && value > 0;
 
-const parseArtifact = (value: unknown): WineRuntimeArtifact => {
+const parseArtifact = (value: unknown, label: string): WineRuntimeArtifact => {
   if (typeof value !== "object" || value === null) {
-    throw new Error("Wine runtime manifest is missing an artifact");
+    throw new Error(`${label} is missing an artifact`);
   }
   const artifact = value as Record<string, unknown>;
   if (!isNonEmptyString(artifact.fileName)) {
-    throw new Error("Wine runtime manifest artifact has no fileName");
+    throw new Error(`${label} artifact has no fileName`);
   }
   if (!isHttpsUrl(artifact.url)) {
-    throw new Error("Wine runtime manifest artifact url must be https");
+    throw new Error(`${label} artifact url must be https`);
   }
   if (
     !isNonEmptyString(artifact.sha256) ||
     !SHA256_PATTERN.test(artifact.sha256)
   ) {
-    throw new Error("Wine runtime manifest artifact sha256 is invalid");
+    throw new Error(`${label} artifact sha256 is invalid`);
   }
   if (!isPositiveNumber(artifact.sizeBytes)) {
-    throw new Error("Wine runtime manifest artifact sizeBytes is invalid");
+    throw new Error(`${label} artifact sizeBytes is invalid`);
   }
   return {
     fileName: artifact.fileName,
@@ -59,28 +59,36 @@ const parseArtifact = (value: unknown): WineRuntimeArtifact => {
   };
 };
 
-export const parseWineRuntimeManifest = (
-  value: unknown
+const parseRuntimeManifest = (
+  value: unknown,
+  label: string
 ): WineRuntimeManifest => {
   if (typeof value !== "object" || value === null) {
-    throw new Error("Wine runtime manifest is invalid");
+    throw new Error(`${label} is invalid`);
   }
   const manifest = value as Record<string, unknown>;
   if (!isNonEmptyString(manifest.version)) {
-    throw new Error("Wine runtime manifest has no version");
+    throw new Error(`${label} has no version`);
   }
   if (!isNonEmptyString(manifest.license)) {
-    throw new Error("Wine runtime manifest has no license");
+    throw new Error(`${label} has no license`);
   }
   if (!isHttpsUrl(manifest.sourceUrl)) {
-    throw new Error("Wine runtime manifest sourceUrl must be https");
+    throw new Error(`${label} sourceUrl must be https`);
   }
   return {
     version: manifest.version,
     license: manifest.license,
     sourceUrl: manifest.sourceUrl,
-    artifact: parseArtifact(manifest.artifact),
+    artifact: parseArtifact(manifest.artifact, label),
   };
 };
 
+export const parseWineRuntimeManifest = (value: unknown): WineRuntimeManifest =>
+  parseRuntimeManifest(value, "Wine runtime manifest");
+
+export const parseDxvkManifest = (value: unknown): WineRuntimeManifest =>
+  parseRuntimeManifest(value, "DXVK runtime manifest");
+
 export const wineRuntimeManifest = parseWineRuntimeManifest(manifestJson);
+export const dxvkManifest = parseDxvkManifest(manifestJson.dxvk);

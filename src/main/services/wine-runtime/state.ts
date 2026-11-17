@@ -6,6 +6,7 @@ export interface WineRuntimeState {
   version: string;
   binaryRelativePath: string;
   installedAt: number;
+  dxvkVersion?: string;
 }
 
 const STATE_FILE_NAME = "state.json";
@@ -27,10 +28,14 @@ export const parseWineRuntimeState = (
   ) {
     return null;
   }
+  if (state.dxvkVersion !== undefined && !isNonEmptyString(state.dxvkVersion)) {
+    return null;
+  }
   return {
     version: state.version,
     binaryRelativePath: state.binaryRelativePath,
     installedAt: state.installedAt,
+    ...(state.dxvkVersion ? { dxvkVersion: state.dxvkVersion } : {}),
   };
 };
 
