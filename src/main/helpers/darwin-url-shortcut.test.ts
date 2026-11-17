@@ -488,7 +488,7 @@ describe("createDarwinAppShortcut", () => {
         name: "Game",
         url,
         legacySymlinkTarget: executablePath,
-        iconPngPath: png,
+        iconPath: png,
         convertIcon: (pngPath, icnsPath) => {
           calls.push([pngPath, icnsPath]);
           fs.writeFileSync(icnsPath, "icns");
@@ -516,10 +516,41 @@ describe("createDarwinAppShortcut", () => {
     assert.ok(readPlist(dir).includes("<key>CFBundleIconFile</key>"));
   });
 
-  it("skips the icon for non-png sources", () => {
+  it("passes an .ico source to the converter", () => {
     const dir = makeTempDir();
-    const ico = path.join(dir, "icon.ico");
+    const ico = path.join(dir, "icon.ICO");
     fs.writeFileSync(ico, "ico");
+    const calls: string[] = [];
+
+    assert.equal(
+      createDarwinAppShortcut({
+        outputDir: dir,
+        name: "Game",
+        url,
+        legacySymlinkTarget: executablePath,
+        iconPath: ico,
+        convertIcon: (iconPath, icnsPath) => {
+          calls.push(iconPath);
+          fs.writeFileSync(icnsPath, "icns");
+          return true;
+        },
+      }),
+      true
+    );
+
+    assert.deepEqual(calls, [ico]);
+    assert.ok(
+      fs.existsSync(
+        path.join(dir, "Game.app", "Contents", "Resources", "icon.icns")
+      )
+    );
+    assert.ok(readPlist(dir).includes("<key>CFBundleIconFile</key>"));
+  });
+
+  it("skips the icon for non-png/non-ico sources", () => {
+    const dir = makeTempDir();
+    const jpg = path.join(dir, "icon.jpg");
+    fs.writeFileSync(jpg, "jpg");
     let convertCalls = 0;
 
     assert.equal(
@@ -528,7 +559,7 @@ describe("createDarwinAppShortcut", () => {
         name: "Game",
         url,
         legacySymlinkTarget: executablePath,
-        iconPngPath: ico,
+        iconPath: jpg,
         convertIcon: () => {
           convertCalls += 1;
           return true;
@@ -557,7 +588,7 @@ describe("createDarwinAppShortcut", () => {
         name: "Game",
         url,
         legacySymlinkTarget: executablePath,
-        iconPngPath: png,
+        iconPath: png,
         convertIcon: (_pngPath, icnsPath) => {
           // A converter may leave a partial file behind before failing.
           fs.writeFileSync(icnsPath, "");

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -11,27 +10,17 @@ import {
   SHORTCUT_EXECUTABLE_NAME,
   SHORTCUT_ICON_FILE_NAME,
 } from "./darwin-app-shortcut-content.js";
+import {
+  convertShortcutIcon,
+  isShortcutIconSource,
+} from "./darwin-shortcut-icon.js";
 
 // Finder refuses to open .webloc files with a custom scheme (LaunchServices
 // -10400), so a macOS shortcut is a tiny app bundle whose executable just
 // hands the deep link back to Hydra via `open`.
 
-const convertIconWithSips = (pngPath: string, icnsPath: string): boolean => {
-  try {
-    execFileSync("/usr/bin/sips", [
-      "-s",
-      "format",
-      "icns",
-      pngPath,
-      "--out",
-      icnsPath,
-    ]);
-
-    return fs.statSync(icnsPath).size > 0;
-  } catch {
-    return false;
-  }
-};
+const convertIconWithSips = (iconPath: string, icnsPath: string): boolean =>
+  convertShortcutIcon({ sourcePath: iconPath, icnsPath });
 
 const pathExists = (target: string) => {
   try {
@@ -109,15 +98,15 @@ const writeBundle = ({
   name,
   bundleId,
   url,
-  iconPngPath,
+  iconPath,
   convertIcon,
 }: {
   bundleDir: string;
   name: string;
   bundleId: string;
   url: string;
-  iconPngPath?: string | null;
-  convertIcon: (pngPath: string, icnsPath: string) => boolean;
+  iconPath?: string | null;
+  convertIcon: (iconPath: string, icnsPath: string) => boolean;
 }) => {
   const contentsDir = path.join(bundleDir, "Contents");
   const macOsDir = path.join(contentsDir, "MacOS");
@@ -128,11 +117,11 @@ const writeBundle = ({
 
   let hasIcon = false;
 
-  if (iconPngPath && path.extname(iconPngPath).toLowerCase() === ".png") {
+  if (iconPath && isShortcutIconSource(iconPath)) {
     const icnsPath = path.join(resourcesDir, SHORTCUT_ICON_FILE_NAME);
 
     try {
-      hasIcon = convertIcon(iconPngPath, icnsPath);
+      hasIcon = convertIcon(iconPath, icnsPath);
     } catch {
       hasIcon = false;
     }
@@ -161,7 +150,7 @@ export const createDarwinAppShortcut = ({
   name,
   url,
   legacySymlinkTarget,
-  iconPngPath,
+  iconPath,
   convertIcon = convertIconWithSips,
   renameFile = fs.renameSync,
 }: {
@@ -169,8 +158,8 @@ export const createDarwinAppShortcut = ({
   name: string;
   url: string;
   legacySymlinkTarget: string;
-  iconPngPath?: string | null;
-  convertIcon?: (pngPath: string, icnsPath: string) => boolean;
+  iconPath?: string | null;
+  convertIcon?: (iconPath: string, icnsPath: string) => boolean;
   /** Seam so the rollback after a failed swap can be tested. */
   renameFile?: (from: string, to: string) => void;
 }): boolean => {
@@ -208,7 +197,7 @@ export const createDarwinAppShortcut = ({
       name,
       bundleId: buildShortcutBundleId(name),
       url,
-      iconPngPath,
+      iconPath,
       convertIcon,
     });
 

@@ -1298,7 +1298,7 @@ export class GameFilesManager {
           name: shortcutName,
           url: deepLink,
           legacySymlinkTarget: process.execPath,
-          iconPngPath: iconPath,
+          iconPath,
         });
 
         if (desktopSuccess) {
