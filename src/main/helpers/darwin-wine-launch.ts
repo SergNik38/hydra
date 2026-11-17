@@ -1,11 +1,14 @@
+import path from "node:path";
 import type { UmuStatus } from "@main/services/umu-launch-monitor";
 import { WineRuntime } from "@main/services/wine-runtime";
 import { dxvkManifest } from "@main/services/wine-runtime/manifest";
 import { ensureWinePrefix } from "@main/services/wine-runtime/prefix";
 import { ensurePrefixDxvk } from "@main/services/wine-runtime/prefix-dxvk";
+import { runSingleFlight } from "@main/services/wine-runtime/single-flight";
+import { prepareDarwinWineRedist } from "./darwin-wine-redist";
 import { createWineRuntimeProgressReporter } from "./wine-runtime-progress";
 
-export const prepareDarwinWinePrefix = async (
+const preparePrefix = async (
   winePrefixPath: string,
   onStatus?: (status: UmuStatus) => void
 ): Promise<string> => {
@@ -32,5 +35,20 @@ export const prepareDarwinWinePrefix = async (
     onInstall: () => onStatus?.({ type: "progress", message: "DXVK" }),
   });
 
+  await prepareDarwinWineRedist(wineBinaryPath, winePrefixPath, onStatus);
+
   return wineBinaryPath;
 };
+
+/**
+ * One preparation per prefix at a time: a launch prepares the prefix twice
+ * (cloud save restore, then the game) and repeated Play clicks overlap, so
+ * wineboot, DXVK and the redistributables must not run twice in parallel.
+ */
+export const prepareDarwinWinePrefix = (
+  winePrefixPath: string,
+  onStatus?: (status: UmuStatus) => void
+): Promise<string> =>
+  runSingleFlight(`prepare:${path.resolve(winePrefixPath)}`, () =>
+    preparePrefix(winePrefixPath, onStatus)
+  );

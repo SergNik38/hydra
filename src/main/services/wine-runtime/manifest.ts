@@ -14,6 +14,15 @@ export interface WineRuntimeManifest {
   artifact: WineRuntimeArtifact;
 }
 
+export interface WineRedistInstaller extends WineRuntimeArtifact {
+  args: string[];
+}
+
+export interface WineRedistManifest {
+  version: string;
+  installers: WineRedistInstaller[];
+}
+
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 
 const isNonEmptyString = (value: unknown): value is string =>
@@ -84,6 +93,46 @@ const parseRuntimeManifest = (
   };
 };
 
+const parseRedistInstaller = (
+  value: unknown,
+  label: string
+): WineRedistInstaller => {
+  if (typeof value !== "object" || value === null) {
+    throw new Error(`${label} is invalid`);
+  }
+  const installer = value as Record<string, unknown>;
+  if (
+    !Array.isArray(installer.args) ||
+    !installer.args.every((argument) => isNonEmptyString(argument))
+  ) {
+    throw new Error(`${label} installer args are invalid`);
+  }
+  return {
+    ...parseArtifact(installer, label),
+    args: installer.args as string[],
+  };
+};
+
+export const parseRedistManifest = (value: unknown): WineRedistManifest => {
+  const label = "Redistributable manifest";
+  if (typeof value !== "object" || value === null) {
+    throw new Error(`${label} is invalid`);
+  }
+  const manifest = value as Record<string, unknown>;
+  if (!isNonEmptyString(manifest.version)) {
+    throw new Error(`${label} has no version`);
+  }
+  if (!Array.isArray(manifest.installers) || manifest.installers.length === 0) {
+    throw new Error(`${label} has no installers`);
+  }
+  return {
+    version: manifest.version,
+    installers: manifest.installers.map((installer) =>
+      parseRedistInstaller(installer, label)
+    ),
+  };
+};
+
 export const parseWineRuntimeManifest = (value: unknown): WineRuntimeManifest =>
   parseRuntimeManifest(value, "Wine runtime manifest");
 
@@ -92,3 +141,4 @@ export const parseDxvkManifest = (value: unknown): WineRuntimeManifest =>
 
 export const wineRuntimeManifest = parseWineRuntimeManifest(manifestJson);
 export const dxvkManifest = parseDxvkManifest(manifestJson.dxvk);
+export const redistManifest = parseRedistManifest(manifestJson.redist);

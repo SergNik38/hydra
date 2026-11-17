@@ -60,6 +60,21 @@ describe("wine runtime state", () => {
     });
   });
 
+  it("round-trips the optional redist version", async () => {
+    await withTempDir(async (directory) => {
+      const state = {
+        version: "staging-11.18",
+        binaryRelativePath: path.join("wine", "bin", "wine64"),
+        installedAt: 1_700_000_000_000,
+        redistVersion: "vcaio-openal-1",
+      };
+
+      await writeWineRuntimeState(directory, state);
+
+      assert.deepEqual(readWineRuntimeState(directory), state);
+    });
+  });
+
   it("returns null for a missing state file", async () => {
     await withTempDir(async (directory) => {
       assert.equal(readWineRuntimeState(directory), null);
@@ -98,6 +113,15 @@ describe("wine runtime state", () => {
         binaryRelativePath: "wine",
         installedAt: 1,
         dxvkVersion: "",
+      }),
+      null
+    );
+    assert.equal(
+      parseWineRuntimeState({
+        version: "staging-11.18",
+        binaryRelativePath: "wine",
+        installedAt: 1,
+        redistVersion: "",
       }),
       null
     );

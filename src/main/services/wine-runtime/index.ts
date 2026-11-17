@@ -10,7 +10,12 @@ import {
   findInstalledDxvkDirectory,
 } from "./dxvk";
 import { installArchive } from "./install";
-import { dxvkManifest, wineRuntimeManifest } from "./manifest";
+import { dxvkManifest, redistManifest, wineRuntimeManifest } from "./manifest";
+import {
+  ensureRedistDownloaded,
+  findInstalledRedistDirectory,
+  REDIST_DIRECTORY_NAME,
+} from "./redist";
 import { isRosettaAvailable, needsRosetta } from "./rosetta";
 import { readWineRuntimeState, writeWineRuntimeState } from "./state";
 
@@ -62,7 +67,8 @@ const removeOtherVersions = async (keptVersion: string) => {
         (entry) =>
           entry.isDirectory() &&
           entry.name !== keptVersion &&
-          entry.name !== DXVK_DIRECTORY_NAME
+          entry.name !== DXVK_DIRECTORY_NAME &&
+          entry.name !== REDIST_DIRECTORY_NAME
       )
       .map((entry) =>
         fs.promises
@@ -77,6 +83,7 @@ const removeOtherVersions = async (keptVersion: string) => {
 
 export class WineRuntime {
   private static installPromise: Promise<void> | null = null;
+  private static redistPromise: Promise<void> | null = null;
 
   public static async getStatus(): Promise<WineRuntimeStatus> {
     if (!isSupported()) return "unsupported";
@@ -102,6 +109,16 @@ export class WineRuntime {
     return findInstalledDxvkDirectory(managedDirectory, state.dxvkVersion);
   }
 
+  public static getRedistDirectory(): string | null {
+    if (!isSupported()) return null;
+
+    const managedDirectory = getManagedDirectory();
+    const state = readWineRuntimeState(managedDirectory);
+    if (!state) return null;
+
+    return findInstalledRedistDirectory(managedDirectory, state.redistVersion);
+  }
+
   public static ensureInstalled(
     onProgress?: DownloadProgressCallback
   ): Promise<void> {
@@ -110,6 +127,16 @@ export class WineRuntime {
       this.installPromise = null;
     });
     return this.installPromise;
+  }
+
+  public static ensureRedistInstalled(
+    onProgress?: DownloadProgressCallback
+  ): Promise<void> {
+    if (!isSupported()) return Promise.resolve();
+    this.redistPromise ??= this.runRedistInstall(onProgress).finally(() => {
+      this.redistPromise = null;
+    });
+    return this.redistPromise;
   }
 
   private static async runInstall(
@@ -185,5 +212,33 @@ export class WineRuntime {
     }
 
     await removeOtherVersions(wineRuntimeManifest.version);
+  }
+
+  private static async runRedistInstall(
+    onProgress?: DownloadProgressCallback
+  ): Promise<void> {
+    const managedDirectory = getManagedDirectory();
+    const missing = WineRuntime.getRedistDirectory() === null;
+
+    if (missing) {
+      logger.info("Installing Windows redistributables", {
+        version: redistManifest.version,
+      });
+    }
+
+    try {
+      await ensureRedistDownloaded({ managedDirectory, onProgress });
+      if (missing) {
+        logger.info("Windows redistributables installed", {
+          version: redistManifest.version,
+        });
+      }
+    } catch (error) {
+      logger.warn("Failed to install Windows redistributables", {
+        version: redistManifest.version,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 }

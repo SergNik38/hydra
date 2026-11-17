@@ -8,6 +8,25 @@
     "sha256": "b63704b91af269bc026a87f12bd297c4a50caaf570c322e600b6621ef918f127",
     "sizeBytes": 192937984
   },
+  "redist": {
+    "version": "vcaio-openal-1",
+    "installers": [
+      {
+        "fileName": "VisualCppRedist_AIO_x86_x64.exe",
+        "url": "https://github.com/hydralauncher/hydra-common-redist/raw/1e1e479301dc476bc52c8fc3c621e53d74390a23/VisualCppRedist_AIO_x86_x64.exe",
+        "sha256": "341513a8c49e3780bc01acde9c893e8176072412f042e83f2a9f296e6328eba4",
+        "sizeBytes": 29037257,
+        "args": ["/ai", "/gm2"]
+      },
+      {
+        "fileName": "oalinst.exe",
+        "url": "https://github.com/hydralauncher/hydra-common-redist/raw/1e1e479301dc476bc52c8fc3c621e53d74390a23/oalinst.exe",
+        "sha256": "b8f39714d41e009f75efb183c37100f2cbabb71784bbd243be881ac5b42d86fd",
+        "sizeBytes": 809496,
+        "args": ["/silent"]
+      }
+    ]
+  },
   "dxvk": {
     "version": "1.10.3-20230507-repack",
     "license": "Zlib",
