@@ -1,52 +1,110 @@
 <div align="center">
 
-[<img src="https://raw.githubusercontent.com/hydralauncher/hydra/refs/heads/main/resources/icon.png" width="144"/>](https://help.hydralauncher.gg)
+<img src="./resources/icon.png" width="128" alt="Hydra Launcher icon"/>
 
-  <h1 align="center">Hydra Launcher</h1>
+<h1>Hydra Launcher for macOS</h1>
 
-  <p align="center">
-    <strong>Hydra Launcher is an open-source gaming platform created to be the single tool that you need in order to manage your gaming library. Hydra is written in Node.js (Electron, React, Typescript) and Rust, with libtorrent providing the torrent engine.</strong>
-  </p>
+<p><strong>Play your game library on a Mac — including Windows games, with Wine set up for you.</strong></p>
 
-[![build](https://img.shields.io/github/actions/workflow/status/hydralauncher/hydra/build.yml)](https://github.com/hydralauncher/hydra/actions)
-[![release](https://img.shields.io/github/package-json/v/hydralauncher/hydra)](https://github.com/hydralauncher/hydra/releases)
-[![chocolatey](https://img.shields.io/chocolatey/v/hydralauncher.svg)](https://community.chocolatey.org/packages/hydralauncher)
+[![Latest release](https://img.shields.io/github/v/release/SergNik38/hydra?label=release)](https://github.com/SergNik38/hydra/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/SergNik38/hydra/total)](https://github.com/SergNik38/hydra/releases)
+[![macOS](https://img.shields.io/badge/macOS-Intel-black?logo=apple)](https://github.com/SergNik38/hydra/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 
-![Hydra Launcher Home Page](./docs/screenshot.png)
+**[⬇️ Download for macOS (Intel)](https://github.com/SergNik38/hydra/releases/latest)**
+
+![Hydra Launcher](./docs/screenshot.png)
 
 </div>
 
+## About
+
+This is an unofficial macOS port of [Hydra Launcher](https://github.com/hydralauncher/hydra), the open-source gaming platform built with Electron, React, TypeScript and Rust. It brings the full launcher to the Mac and adds what macOS needs to run Windows games — no manual Wine, CrossOver or bottle setup required.
+
 ## Features
 
-- Add games that you own to your library
-- Have a nice profile that shows what you are playing to your friends
-- Save your game progress in the cloud with Hydra Cloud
-- Unlock achievements
-- Navigate through a rich catalogue with a powerful suggestion algorithm
-- Discover new games that you haven't played before
+- **Windows games on macOS** — Hydra downloads and manages its own Wine runtime (Wine Staging) on the first Windows game launch and creates a separate Wine prefix for every game.
+- **One-click launch and stop** — Windows games are detected while running, playtime is tracked, and the Stop button closes the game and its Wine processes.
+- **Installers just work** — `setup.exe` installers run through the same Wine, and the installed game is found inside its prefix automatically.
+- **Native Mac games** — launch `.app` bundles and track them like any other game.
+- **Full Hydra experience** — catalogue, profile and friends, achievements, downloads (direct links, debrid services, torrents) with automatic extraction and executable detection.
+- **Cloud saves inside Wine prefixes** — save files of Windows games are found where Wine keeps them.
+- **Desktop shortcuts** — launch any game straight from the Desktop.
+- **Update notifications** — the app tells you when a new macOS release is out.
 
-## Build from source and contributing
+## Installation
 
-Please, refer to our Documentation pages: [docs.hydralauncher.gg](https://docs.hydralauncher.gg/getting-started)
+1. Download the latest `.dmg` from [Releases](https://github.com/SergNik38/hydra/releases/latest).
+2. Open it and drag **Hydra** to **Applications**.
+3. The app is not notarized by Apple, so macOS blocks the first launch. Open **System Settings → Privacy & Security** and click **Open Anyway**, or run:
 
-### Local development requirements
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Hydra.app
+   ```
 
-- Node.js + Yarn
-- Rust toolchain (for `hydra-native`)
-- Git and a C++ toolchain (Visual Studio C++ Build Tools on Windows, GCC/Clang on Linux, Xcode command-line tools on macOS). The native build obtains CMake and CTest automatically through vcpkg.
+The first Windows game you start downloads the Wine runtime (~190 MB) once.
 
-After installing dependencies, `postinstall` now builds the Rust native addon automatically (`hydra-native/hydra-native.node`).
+## Requirements
 
-The native build includes a Rust wrapper around pinned libtorrent. Development and packaged torrenting no longer require Python.
+- macOS on an Intel Mac (Apple Silicon build is coming; Windows games will run there through Rosetta 2).
+- Internet connection for the catalogue, sign-in and the one-time Wine download.
 
-On Windows x64 and Linux x64, the libtorrent bridge comes prebuilt from `native/torrent-bridge/prebuilt`, so installs skip compiling libtorrent through vcpkg. Other platforms build it from source. When a branch push changes `native/torrent-bridge` or `scripts/build-torrent-bridge.cjs`, the "Torrent bridge prebuilts" workflow rebuilds the binaries and commits them to that branch; until then, installs build the bridge from source. Set `HYDRA_TORRENT_BRIDGE_FROM_SOURCE=1` to always build it from source.
+## Status and known limitations
 
-## Contributors
+| Area | Status |
+|---|---|
+| Intel Macs | ✅ Released |
+| Apple Silicon | 🧪 Builds, testing in progress |
+| Windows games via Wine | ✅ Launch, tracking, stop, installers |
+| Cloud saves in Wine prefixes | ✅ |
+| Epic Games Store integration | ❌ Not supported on macOS yet |
+| Code signing / notarization | ❌ Not yet (see Installation) |
+| Automatic update install | ❌ You get a notification; install the new `.dmg` manually |
 
-<a href="https://github.com/hydralauncher/hydra/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=hydralauncher/hydra" />
-</a>
+Game compatibility depends on Wine: many Windows games run, but games with kernel-level anti-cheat do not. Reports of what works are very welcome.
+
+## FAQ
+
+**Is this the official Hydra app?**
+No. It is a community fork focused on macOS. The original project lives at [hydralauncher/hydra](https://github.com/hydralauncher/hydra).
+
+**Do I need to install Wine, CrossOver or Whisky?**
+No. Hydra downloads and manages its own Wine build.
+
+**Where does Hydra keep Wine and game prefixes?**
+In `~/Library/Application Support/hydralauncher/` (`wine-runtime` and `wine-prefixes`). You can change the prefix location in Settings → Compatibility.
+
+**Why does macOS say the app can't be checked for malware?**
+The app is signed ad hoc, not with a paid Apple Developer ID. Use **Open Anyway** once, as described above.
+
+## Building from source
+
+Requirements: Node.js, Yarn, Rust (`rustup`), Xcode Command Line Tools.
+
+```bash
+git clone https://github.com/SergNik38/hydra.git
+cd hydra
+yarn install                       # also builds the native addon for your Mac
+cp .env.example .env               # fill in the API settings
+yarn dev                           # run in development mode
+```
+
+Release build (both architectures):
+
+```bash
+HYDRA_NATIVE_ARCH=x64   yarn build:native
+HYDRA_NATIVE_ARCH=arm64 yarn build:native
+yarn build:mac-release 4.4.1001    # writes the .dmg files and latest-mac.yml to dist/
+```
+
+## Contributing
+
+Issues and pull requests are welcome, especially game compatibility reports and Apple Silicon testing. When reporting a game problem, please include the game, the macOS version, your Mac's chip and the Hydra log from `~/Library/Application Support/hydralauncher/logs/`.
+
+## Credits
+
+Hydra Launcher is created by [Los Broxas](https://github.com/hydralauncher) and the [Hydra contributors](https://github.com/hydralauncher/hydra/graphs/contributors). The macOS Wine runtime is based on [Gcenx's macOS Wine builds](https://github.com/Gcenx/macOS_Wine_builds).
 
 ## License
 
-Hydra is licensed under the [MIT License](LICENSE).
+[MIT](./LICENSE) — Copyright (c) 2024 Los Broxas. macOS port changes are released under the same license.
