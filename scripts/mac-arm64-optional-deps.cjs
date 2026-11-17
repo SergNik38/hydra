@@ -14,8 +14,14 @@ const ARM64_SUFFIX = "-darwin-arm64";
 const PACK_CACHE_DIR = path.join(".cache", "mac-arm64-deps");
 const BINARY_EXTENSIONS = new Set([".node", ".dylib"]);
 
+// stdout is captured (npm pack prints the tarball name there) while npm's
+// notices keep going to stderr, so the build log stays readable.
 const defaultRun = (command, args, options) => {
-  execFileSync(command, args, { ...options, stdio: "inherit" });
+  const stdout = execFileSync(command, args, {
+    stdio: ["ignore", "pipe", "inherit"],
+    ...options,
+  });
+  return stdout == null ? "" : String(stdout);
 };
 
 const defaultGetArchs = (binary) =>
@@ -88,24 +94,49 @@ function extractTarball(tarball, destination, run) {
   return temporary;
 }
 
+// npm names scoped tarballs without the @scope/ prefix:
+// @img/sharp-darwin-arm64@0.35.0 -> img-sharp-darwin-arm64-0.35.0.tgz
+const tarballFileName = (dep) =>
+  `${dep.name.replace(/^@/, "").replace("/", "-")}-${dep.version}.tgz`;
+
+const lastNonEmptyLine = (stdout) =>
+  String(stdout ?? "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .pop() ?? "";
+
+// Trust what npm pack reported, fall back to npm's naming rule, then insist the
+// file is really there so a silent change in npm's output cannot slip through.
+function resolveTarball(packDir, dep, stdout) {
+  const reported = lastNonEmptyLine(stdout);
+  const candidates = [...new Set([reported, tarballFileName(dep)])]
+    .filter(Boolean)
+    .map((name) => path.join(packDir, path.basename(name)));
+  const tarball = candidates.find((file) => fs.existsSync(file));
+  if (!tarball) {
+    throw new Error(
+      `npm pack did not produce a tarball for ${dep.name}@${dep.version} in ${packDir} (looked for ${candidates.join(", ")}).`
+    );
+  }
+  return tarball;
+}
+
 function installDep(dep, { projectDir, run, log, getArchs }) {
   const packDir = path.join(projectDir, PACK_CACHE_DIR);
   fs.mkdirSync(packDir, { recursive: true });
 
-  const tarballName = `${dep.name.replace(/^@[^/]+\//, "")}-${dep.version}.tgz`;
-  const tarball = path.join(packDir, tarballName);
-  fs.rmSync(tarball, { force: true });
+  // Drop a leftover from an earlier run so the existence check means something.
+  fs.rmSync(path.join(packDir, tarballFileName(dep)), { force: true });
   log(`Packing ${dep.name}@${dep.version} for darwin-arm64...`);
-  run(
+  const stdout = run(
     "npm",
     ["pack", `${dep.name}@${dep.version}`, "--pack-destination", packDir],
     {
       cwd: projectDir,
     }
   );
-  if (!fs.existsSync(tarball)) {
-    throw new Error(`npm pack did not produce ${tarball}.`);
-  }
+  const tarball = resolveTarball(packDir, dep, stdout);
 
   const destination = path.join(projectDir, "node_modules", dep.name);
   const temporary = extractTarball(tarball, destination, run);

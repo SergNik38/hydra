@@ -55,21 +55,24 @@ function createTarball(tarball, version) {
 }
 
 // Stands in for `npm pack` (no network) and lets tar extraction run for real.
-function createFakeRun() {
+// Like real npm it prints the scoped tarball name to stdout and writes the
+// tarball under that name (@img/sharp-darwin-arm64 -> img-sharp-darwin-arm64-…).
+function createFakeRun({ reportName = true } = {}) {
   const calls = [];
   const run = (command, args) => {
     calls.push([command, ...args]);
     if (command === "/usr/bin/tar") {
       execFileSync(command, args);
-      return;
+      return "";
     }
     assert.equal(command, "npm");
     assert.equal(args[0], "pack");
     const destination = args[args.indexOf("--pack-destination") + 1];
     const [name, version] = args[1].match(/^(.+)@([^@]+)$/).slice(1);
-    const tarballName = `${name.replace(/^@[^/]+\//, "")}-${version}.tgz`;
+    const tarballName = `${name.replace(/^@/, "").replace("/", "-")}-${version}.tgz`;
     fs.mkdirSync(destination, { recursive: true });
     createTarball(path.join(destination, tarballName), version);
+    return reportName ? `${tarballName}\n` : "";
   };
   return { calls, run };
 }
@@ -168,7 +171,7 @@ test("packs, extracts and installs the missing packages", (t) => {
         projectDir,
         ".cache",
         "mac-arm64-deps",
-        "sharp-darwin-arm64-0.35.0.tgz"
+        "img-sharp-darwin-arm64-0.35.0.tgz"
       )
     ),
     true
@@ -180,6 +183,60 @@ test("packs, extracts and installs the missing packages", (t) => {
         args.includes("--strip-components") &&
         args.includes("1")
     )
+  );
+});
+
+test("falls back to npm's tarball naming when npm pack prints nothing", (t) => {
+  const projectDir = createProject({ "@img/sharp-darwin-arm64": "0.35.0" });
+  t.after(() => fs.rmSync(projectDir, { recursive: true, force: true }));
+
+  const { run } = createFakeRun({ reportName: false });
+  const result = ensureMacArm64OptionalDeps({
+    projectDir,
+    run,
+    log: () => {},
+    getArchs: () => "arm64",
+  });
+
+  assert.deepEqual(result.installed, ["@img/sharp-darwin-arm64"]);
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        projectDir,
+        "node_modules",
+        "@img/sharp-darwin-arm64",
+        "lib",
+        "x.dylib"
+      )
+    ),
+    true
+  );
+  assert.equal(
+    fs.existsSync(
+      path.join(
+        projectDir,
+        ".cache",
+        "mac-arm64-deps",
+        "img-sharp-darwin-arm64-0.35.0.tgz"
+      )
+    ),
+    true
+  );
+});
+
+test("throws when npm pack leaves no tarball behind", (t) => {
+  const projectDir = createProject({ "@img/sharp-darwin-arm64": "0.35.0" });
+  t.after(() => fs.rmSync(projectDir, { recursive: true, force: true }));
+
+  assert.throws(
+    () =>
+      ensureMacArm64OptionalDeps({
+        projectDir,
+        run: () => "img-sharp-darwin-arm64-0.35.0.tgz\n",
+        log: () => {},
+        getArchs: () => "arm64",
+      }),
+    /npm pack did not produce a tarball for @img\/sharp-darwin-arm64@0\.35\.0/
   );
 });
 
