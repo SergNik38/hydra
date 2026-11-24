@@ -243,6 +243,9 @@ function fixture() {
         "./game-executables": {
           GameExecutables: { ensureLoaded: async () => {} },
         },
+        "./process-catalogue-match": {
+          matchesCatalogueExecutable: () => false,
+        },
         "@main/helpers/update-executable-path": {},
         axios: {},
         "./cloud-sync": {
